@@ -1,3 +1,7 @@
+# smart_money_scanner_v3_6.py
+# Smart Money Scanner V3.6 — Clean UI, Advanced Toggle, Metrics Sorting
+# Requirements: pip install streamlit requests pandas numpy
+
 import streamlit as st
 import requests
 import pandas as pd
@@ -23,7 +27,7 @@ def okx_get(path, params=None, retries=3, delay=0.6):
     return None
 
 # ----------------------------
-# Data fetchers (cached)
+# Data fetchers
 # ----------------------------
 @st.cache_data(ttl=60)
 def fetch_instruments(inst_type="SWAP"):
@@ -67,7 +71,6 @@ def fetch_oi(instId):
     except Exception:
         return None
 
-# Robust orderbook: handle rows of length 2 or 3, avoid ValueError
 @st.cache_data(ttl=30)
 def fetch_orderbook(instId, depth=40):
     j = okx_get("/api/v5/market/books", {"instId": instId, "sz": str(depth)})
@@ -129,7 +132,8 @@ def orderbook_imbalance(bids, asks):
         return None
     bid_vol = bids["size"].sum()
     ask_vol = asks["size"].sum()
-    return float((bid_vol - ask_vol) / (bid_vol + ask_vol + 1e-9))
+    imb = (bid_vol - ask_vol) / (bid_vol + ask_vol + 1e-9)
+    return float(imb)
 
 def percentile_to_score(val, hist_vals):
     try:
@@ -137,7 +141,8 @@ def percentile_to_score(val, hist_vals):
         arr = arr[~np.isnan(arr)]
         if len(arr)==0 or val is None or isnan(val):
             return None
-        return float((arr < val).sum() / len(arr))
+        p = (arr < val).sum() / len(arr)
+        return float(p)
     except Exception:
         return None
 
@@ -186,19 +191,18 @@ def compute_confidence(instId, bar="1H"):
     ob_imb = orderbook_imbalance(bids, asks)
     bt_win = simple_backtest_winrate(ohlcv, lookahead=6, stop_pct=0.01, rr=2.0)
 
-    # Normalize metrics 0..1
-    fund_score = 0.5 + np.tanh(funding*500)/2 if funding is not None else 0.5
-    oi_score = 0.5 + (np.tanh(np.log1p(oi)/20.0))/2 if oi is not None else 0.5
-    cvd_score = 0.5 + np.tanh(cvd/1e4)/2 if cvd is not None else 0.5
-    ob_score = (ob_imb +1)/2 if ob_imb is not None else 0.5
-    bt_score = bt_win if bt_win is not None else 0.5
+    fund_score = 0.5 + np.tanh(funding * 500)/2 if funding else 0.5
+    oi_score = 0.5 + np.tanh(np.log1p(oi)/20)/2 if oi else 0.5
+    cvd_score = 0.5 + np.tanh(cvd / 1e4)/2 if cvd else 0.5
+    ob_score = (ob_imb + 1)/2 if ob_imb else 0.5
+    bt_score = bt_win if bt_win else 0.5
 
     metrics = {
-        "funding": fund_score,
-        "oi": oi_score,
-        "cvd": cvd_score,
+        "backtest": bt_score,
         "orderbook": ob_score,
-        "backtest": bt_score
+        "cvd": cvd_score,
+        "oi": oi_score,
+        "funding": fund_score
     }
 
     weights = {
@@ -210,17 +214,13 @@ def compute_confidence(instId, bar="1H"):
     }
 
     conf = sum(metrics[k]*weights[k] for k in metrics)
-    confidence_pct = round(max(0, min(conf*100,100)),1)
-
+    confidence_pct = round(conf*100,1)
     if confidence_pct >= 65:
         label = "📈 Bullish"
-        recommendation = "Consider LONG (buy)"
     elif confidence_pct <= 35:
         label = "📉 Bearish"
-        recommendation = "Consider SHORT (sell)"
     else:
         label = "⚠️ Neutral / Mixed"
-        recommendation = "Wait / Observe"
 
     raw = {
         "price": price,
@@ -231,53 +231,41 @@ def compute_confidence(instId, bar="1H"):
         "backtest_win": bt_win
     }
 
-    return {
-        "label": label,
-        "confidence_pct": confidence_pct,
-        "recommendation": recommendation,
-        "metrics": metrics,
-        "weights": weights,
-        "raw": raw
-    }
+    return {"label": label, "confidence_pct": confidence_pct, "metrics": metrics, "weights": weights, "raw": raw}
 
 # ----------------------------
 # Streamlit UI
 # ----------------------------
 st.set_page_config(page_title="Smart Money Scanner V3.6", layout="wide")
-st.title("🧠 Smart Money Scanner V3.6 — Clear + Normalized")
+st.title("🧠 Smart Money Scanner V3.6 — Clean & Clear")
 
 inst_type = st.sidebar.selectbox("Instrument Type", ["SWAP", "SPOT"])
 instruments = fetch_instruments(inst_type)
 if not instruments:
-    st.sidebar.error("Unable to load instruments from OKX.")
+    st.sidebar.error("Unable to load instruments from OKX")
     st.stop()
 
 instId = st.sidebar.selectbox("Instrument", instruments, index=0)
 bar = st.sidebar.selectbox("Timeframe", ["1m","5m","15m","1H","4H","1D"], index=3)
-
-show_raw = st.sidebar.checkbox("Show Raw metrics", value=False)
+show_raw = st.sidebar.checkbox("Show Raw Metrics", value=False)
 
 if st.sidebar.button("Compute Confidence"):
-    with st.spinner("Computing — gathering live data..."):
+    with st.spinner("Gathering live data..."):
         result = compute_confidence(instId, bar)
 
     st.subheader(f"{result['label']} — Confidence: {result['confidence_pct']}%")
-    st.markdown(f"### Recommendation: {result['recommendation']}")
     st.metric("Live Price", f"{result['raw']['price']:,}" if result['raw']['price'] else "N/A")
 
-    # Display metrics with icons
-    icons = {"funding":"💰","oi":"📊","cvd":"📈","orderbook":"⚖️","backtest":"🧪"}
-    cols = st.columns(5)
-    for idx, k in enumerate(["funding","oi","cvd","orderbook","backtest"]):
-        col = cols[idx]
-        score = result["metrics"][k]
-        weight = result["weights"][k]
-        contrib = round(score*weight*100,2)
-        col.metric(label=f"{icons[k]} {k.upper()}", value=f"{score:.3f}", delta=f"w={weight}")
-        col.caption(f"Contribution: {contrib}%")
+    # sort metrics by weight descending
+    sorted_metrics = sorted(result["metrics"].items(), key=lambda x: result["weights"][x[0]], reverse=True)
+    for k,v in sorted_metrics:
+        w = result["weights"][k]
+        contrib = round(v*w*100,2)
+        emoji = "💰" if k=="funding" else "📊" if k=="oi" else "📈" if k=="backtest" else "📉" if k=="cvd" else "🔹"
+        st.markdown(f"### {emoji} {k.upper()}\n**Score:** {v:.3f} | **Weight:** {w} | Contribution: {contrib}%")
 
     if show_raw:
         st.markdown("### Raw metrics (for transparency)")
         st.json(result["raw"])
 else:
-    st.info("Select instrument/timeframe and press 'Compute Confidence' in the sidebar.")
+    st.info("Select instrument/timeframe and press 'Compute Confidence'")
