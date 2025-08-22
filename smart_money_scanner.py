@@ -118,8 +118,9 @@ def generate_insights(metrics):
 # ==========================
 # Streamlit UI
 # ==========================
-st.title("🧠 Smart Money Scanner V3.5.1 — Simple & Clear")
+st.title("🧠 Smart Money Scanner V3.5 — Original UI + Clear Text Output")
 
+# واجهة كما في V3.5
 instType = st.selectbox("Instrument Type", ["SWAP","FUTURES"])
 instId = st.text_input("Instrument", "BTC-USDT-SWAP")
 bar = st.selectbox("Timeframe", ["1H","4H","1D"])
@@ -136,6 +137,7 @@ if st.button("Scan Now"):
     else:
         rec = "⚠️ Neutral / Mixed"
 
+    # عرض النتائج كنص / قائمة نقطية
     st.subheader(f"Recommendation: {rec} — Confidence {confidence*100:.1f}%")
     st.write(f"💰 Live Price: {metrics['price']} USDT")
 
