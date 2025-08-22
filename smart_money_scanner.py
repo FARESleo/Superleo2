@@ -41,9 +41,7 @@ def fetch_ohlcv(instId, bar="1H", limit=300):
         df = pd.DataFrame(j["data"], columns=cols)
     except Exception:
         df = pd.DataFrame(j["data"])
-        # best-effort rename if columns differ
-        rename = {"open":"o","high":"h","low":"l","close":"c","volume":"vol","timestamp":"ts"}
-        df = df.rename(columns=rename)
+        df = df.rename(columns={"open":"o","high":"h","low":"l","close":"c","volume":"vol","timestamp":"ts"})
     for col in ["o","h","l","c","vol"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
@@ -107,7 +105,7 @@ def fetch_trades(instId, limit=400):
     if not j or "data" not in j:
         return pd.DataFrame()
     df = pd.DataFrame(j["data"])
-    # Normalize column names
+    # Normalize columns
     if "px" in df.columns:
         df["price"] = pd.to_numeric(df["px"], errors="coerce")
     if "sz" in df.columns:
@@ -183,7 +181,7 @@ def support_resistance(df, swing=10):
 # Candlestick detections
 # ----------------------------
 def detect_candles(df):
-    """Return a list of simple candle signals from the last 3 bars."""
+    """Return a list of simple candle signals from the last bar vs previous."""
     signals = []
     if df is None or len(df) < 3:
         return signals
@@ -192,7 +190,9 @@ def detect_candles(df):
 
     # Body/Range helpers
     def body(row): return abs(row["c"] - row["o"])
-    def range_(row): return (row["h"] - row["l"]) if (row["h"] - row["l"]) != 0 else 1e-9
+    def range_(row):
+        rng = (row["h"] - row["l"])
+        return rng if rng != 0 else 1e-9
     def upper_wick(row): return row["h"] - max(row["o"], row["c"])
     def lower_wick(row): return min(row["o"], row["c"]) - row["l"]
 
@@ -208,15 +208,15 @@ def detect_candles(df):
         signals.append("Doji")
 
     # Pin bars
-    if lower_wick(last) / range_(last) > 0.6 and last["c"] > last["o"]:
+    if (lower_wick(last) / range_(last)) > 0.6 and last["c"] > last["o"]:
         signals.append("Bullish Pin Bar")
-    if upper_wick(last) / range_(last) > 0.6 and last["c"] < last["o"]:
+    if (upper_wick(last) / range_(last)) > 0.6 and last["c"] < last["o"]:
         signals.append("Bearish Pin Bar")
 
     return signals
 
 # ----------------------------
-# Confidence engine (normalized 0..100)
+# Confidence engine (normalized 0..100, clamped)
 # ----------------------------
 def compute_confidence(instId, bar="1H"):
     ohlcv = fetch_ohlcv(instId, bar, limit=300)
@@ -230,19 +230,19 @@ def compute_confidence(instId, bar="1H"):
     ob_imb = orderbook_imbalance(bids, asks)
     bt_win = simple_backtest_winrate(ohlcv, lookahead=6, stop_pct=0.01, rr=2.0)
 
-    # Normalize 0..1
-    fund_score = 0.5 + np.tanh((funding or 0.0) * 500) / 2.0
-    oi_score = 0.5 + np.tanh(np.log1p(max(oi or 0.0, 0.0)) / 20.0) / 2.0
-    cvd_score = 0.5 + np.tanh((cvd or 0.0) / 1e4) / 2.0
-    ob_score = 0.5 if ob_imb is None else (ob_imb + 1.0) / 2.0
-    bt_score = 0.5 if bt_win is None else float(np.clip(bt_win, 0.0, 1.0))
+    # Normalize to 0..1 with conservative scales
+    fund_score = 0.5 + np.tanh((funding or 0.0) * 500.0) / 2.0
+    oi_score   = 0.5 + np.tanh(np.log1p(max(oi or 0.0, 0.0)) / 20.0) / 2.0
+    cvd_score  = 0.5 + np.tanh((cvd or 0.0) / 1e4) / 2.0
+    ob_score   = 0.5 if ob_imb is None else (ob_imb + 1.0) / 2.0
+    bt_score   = 0.5 if bt_win is None else float(np.clip(bt_win, 0.0, 1.0))
 
     metrics = {
         "funding": float(np.clip(fund_score, 0.0, 1.0)),
-        "oi": float(np.clip(oi_score, 0.0, 1.0)),
-        "cvd": float(np.clip(cvd_score, 0.0, 1.0)),
-        "orderbook": float(np.clip(ob_score, 0.0, 1.0)),
-        "backtest": float(np.clip(bt_score, 0.0, 1.0)),
+        "oi"     : float(np.clip(oi_score,     0.0, 1.0)),
+        "cvd"    : float(np.clip(cvd_score,    0.0, 1.0)),
+        "orderbook": float(np.clip(ob_score,   0.0, 1.0)),
+        "backtest" : float(np.clip(bt_score,   0.0, 1.0)),
     }
 
     weights = {
@@ -302,9 +302,9 @@ def suggest_trade(conf_label, price, support, resistance, ob_imb, candles):
         rationale.append("Candles: " + ", ".join(candles))
 
     if ob_imb is not None:
-        if ob_imb > 0.1:
+        if ob_imb > 0.10:
             rationale.append("Orderbook shows bid dominance (buy-side liquidity).")
-        elif ob_imb < -0.1:
+        elif ob_imb < -0.10:
             rationale.append("Orderbook shows ask dominance (sell-side liquidity).")
         else:
             rationale.append("Orderbook balanced.")
@@ -312,14 +312,14 @@ def suggest_trade(conf_label, price, support, resistance, ob_imb, candles):
     if conf_label == "📈 Bullish":
         action = "LONG (Buy)"
         target = (resistance * 0.995) if resistance else (price * 1.02 if price else None)
-        stop = (support * 0.995) if support else (price * 0.99 if price else None)
+        stop   = (support * 0.995)    if support    else (price * 0.99 if price else None)
         rationale.append("Bias: Bullish (confidence engine).")
         if support and resistance:
             rationale.append(f"Trade within S/R range: support≈{support:.4f}, resistance≈{resistance:.4f}.")
     elif conf_label == "📉 Bearish":
         action = "SHORT (Sell)"
-        target = (support * 1.005) if support else (price * 0.98 if price else None)
-        stop = (resistance * 1.005) if resistance else (price * 1.01 if price else None)
+        target = (support * 1.005)    if support    else (price * 0.98 if price else None)
+        stop   = (resistance * 1.005) if resistance else (price * 1.01 if price else None)
         rationale.append("Bias: Bearish (confidence engine).")
         if support and resistance:
             rationale.append(f"Trade within S/R range: support≈{support:.4f}, resistance≈{resistance:.4f}.")
@@ -329,7 +329,9 @@ def suggest_trade(conf_label, price, support, resistance, ob_imb, candles):
     def safe(v):
         return v if (v is not None and np.isfinite(v) and v > 0) else None
 
-    entry = safe(entry); target = safe(target); stop = safe(stop)
+    entry  = safe(entry)
+    target = safe(target)
+    stop   = safe(stop)
 
     rr = None
     if entry and target and stop:
