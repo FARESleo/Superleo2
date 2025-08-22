@@ -22,10 +22,27 @@ def fetch_oi(instId="BTC-USDT-SWAP"):
 
 def fetch_orderbook(instId="BTC-USDT-SWAP", depth=20):
     r = requests.get(f"{BASE_URL}/api/v5/market/books", params={"instId": instId, "sz": depth})
-    ob = r.json().get("data", [])[0]
-    bids = pd.DataFrame(ob.get("bids", []), columns=["price", "size", "liq"]).astype(float)
-    asks = pd.DataFrame(ob.get("asks", []), columns=["price", "size", "liq"]).astype(float)
-    return bids, asks
+    ob_data = r.json().get("data", [])
+    if not ob_data:
+        empty_df = pd.DataFrame(columns=["price","size","liq"], dtype=float)
+        return empty_df, empty_df
+
+    ob = ob_data[0]
+
+    bids_list = ob.get("bids", [])
+    asks_list = ob.get("asks", [])
+
+    if not bids_list:
+        bids_df = pd.DataFrame(columns=["price","size","liq"], dtype=float)
+    else:
+        bids_df = pd.DataFrame(bids_list, columns=["price","size","liq"]).astype(float)
+
+    if not asks_list:
+        asks_df = pd.DataFrame(columns=["price","size","liq"], dtype=float)
+    else:
+        asks_df = pd.DataFrame(asks_list, columns=["price","size","liq"]).astype(float)
+
+    return bids_df, asks_df
 
 def fetch_candles(instId="BTC-USDT-SWAP", bar="1H", limit=100):
     r = requests.get(f"{BASE_URL}/api/v5/market/candles", params={"instId": instId, "bar": bar, "limit": limit})
@@ -48,8 +65,9 @@ def compute_confidence(instId="BTC-USDT-SWAP", bar="1H"):
     price = float(ticker["last"])
     funding_rate = float(funding["fundingRate"])
     oi_val = float(oi["oi"])
-    cvd = (df["c"].diff() * df["vol"]).sum()  # simple proxy
-    ob_imb = (bids["size"].sum() - asks["size"].sum()) / (bids["size"].sum() + asks["size"].sum())
+    cvd = (df["c"].diff() * df["vol"]).sum() if not df.empty else 0  # simple proxy
+    ob_imb = ((bids["size"].sum() - asks["size"].sum()) / 
+              (bids["size"].sum() + asks["size"].sum())) if not bids.empty and not asks.empty else 0
 
     # Normalize 0-1
     score_funding = 1 - abs(funding_rate * 1000)
@@ -118,7 +136,7 @@ def generate_insights(metrics):
 # ==========================
 # Streamlit UI
 # ==========================
-st.title("🧠 Smart Money Scanner V3.5 — Original UI + Clear Text Output")
+st.title("🧠 Smart Money Scanner V3.5.3 — Stable Original UI + Clear Text Output")
 
 # واجهة كما في V3.5
 instType = st.selectbox("Instrument Type", ["SWAP","FUTURES"])
@@ -126,25 +144,28 @@ instId = st.text_input("Instrument", "BTC-USDT-SWAP")
 bar = st.selectbox("Timeframe", ["1H","4H","1D"])
 
 if st.button("Scan Now"):
-    metrics = compute_confidence(instId, bar)
-    confidence = metrics["confidence"]
+    try:
+        metrics = compute_confidence(instId, bar)
+        confidence = metrics["confidence"]
 
-    # Recommendation
-    if confidence > 0.65:
-        rec = "🟢 Bullish"
-    elif confidence < 0.35:
-        rec = "🔴 Bearish"
-    else:
-        rec = "⚠️ Neutral / Mixed"
+        # Recommendation
+        if confidence > 0.65:
+            rec = "🟢 Bullish"
+        elif confidence < 0.35:
+            rec = "🔴 Bearish"
+        else:
+            rec = "⚠️ Neutral / Mixed"
 
-    # عرض النتائج كنص / قائمة نقطية
-    st.subheader(f"Recommendation: {rec} — Confidence {confidence*100:.1f}%")
-    st.write(f"💰 Live Price: {metrics['price']} USDT")
+        # عرض النتائج كنص / قائمة نقطية
+        st.subheader(f"Recommendation: {rec} — Confidence {confidence*100:.1f}%")
+        st.write(f"💰 Live Price: {metrics['price']} USDT")
 
-    st.subheader("📖 Auto-Insights")
-    for ins in generate_insights(metrics):
-        st.write(f"- {ins}")
+        st.subheader("📖 Auto-Insights")
+        for ins in generate_insights(metrics):
+            st.write(f"- {ins}")
 
-    # Advanced toggle
-    if st.checkbox("Advanced Mode (Show Raw metrics)"):
-        st.json(metrics)
+        # Advanced toggle
+        if st.checkbox("Advanced Mode (Show Raw metrics)"):
+            st.json(metrics)
+    except Exception as e:
+        st.error(f"❌ حدث خطأ أثناء التحليل: {e}")
