@@ -97,16 +97,28 @@ def generate_insights(metrics):
         insights.append("⚪ التمويل محايد.")
 
     if metrics["oi"] > 1e7:
-        insights.append("📈 حجم العقود مرتفع → نشاط قوي.")
+        insights.append("📈 حجم العقود مرتفع → السوق نشط.")
     else:
         insights.append("📉 حجم العقود ضعيف نسبياً.")
+
+    if metrics["orderbook_imbalance"] > 0.05:
+        insights.append("🟢 اختلال دفتر الأوامر لصالح المشترين.")
+    elif metrics["orderbook_imbalance"] < -0.05:
+        insights.append("🔴 اختلال دفتر الأوامر لصالح البائعين.")
+    else:
+        insights.append("⚪ اختلال دفتر الأوامر متوازن.")
+
+    if metrics["backtest_win"] < 0.3:
+        insights.append("⚠️ الباكتيست ضعيف → الاستراتيجية لم تنجح تاريخياً.")
+    elif metrics["backtest_win"] > 0.6:
+        insights.append("✅ الباكتيست جيد → الخطة أعطت نتائج إيجابية تاريخياً.")
 
     return insights
 
 # ==========================
 # Streamlit UI
 # ==========================
-st.title("🧠 Smart Money Scanner V3.6 — Clear & Robust")
+st.title("🧠 Smart Money Scanner V3.5.1 — Simple & Clear")
 
 instType = st.selectbox("Instrument Type", ["SWAP","FUTURES"])
 instId = st.text_input("Instrument", "BTC-USDT-SWAP")
@@ -129,7 +141,7 @@ if st.button("Scan Now"):
 
     st.subheader("📖 Auto-Insights")
     for ins in generate_insights(metrics):
-        st.write(ins)
+        st.write(f"- {ins}")
 
     # Advanced toggle
     if st.checkbox("Advanced Mode (Show Raw metrics)"):
