@@ -9,7 +9,7 @@ from datetime import datetime
 OKX_BASE = "https://www.okx.com"
 
 # ----------------------------
-# CSS Styling for a high-contrast, modern look
+# CSS Styling for high-contrast minimal design
 # ----------------------------
 st.markdown("""
 <style>
@@ -19,8 +19,8 @@ st.markdown("""
     padding-bottom: 5rem;
     padding-left: 1rem;
     padding-right: 1rem;
-    background-color: #0D0D0D; /* A very dark grey background */
-    color: #FFFFFF; /* Pure white text for maximum contrast */
+    background-color: #000000; /* Pure black background for max contrast */
+    color: #FFFFFF; /* Pure white text */
 }
 
 /* Hide Streamlit's default hamburger menu */
@@ -34,45 +34,46 @@ st.markdown("""
 
 /* Card-like containers for sections */
 .stCard {
-    background-color: #1a1a1a; /* Slightly lighter than the background */
+    background-color: rgba(26, 26, 26, 0.7); /* Semi-transparent background */
+    backdrop-filter: blur(10px); /* Frosted glass effect */
     border-radius: 10px;
     padding: 20px;
     margin-bottom: 20px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-    border: 1px solid #333333;
+    border: 1px solid rgba(255, 255, 255, 0.1); /* Subtle white border */
 }
 
 /* Metrics styling */
 .stMetric {
-    background-color: #222222;
+    background-color: rgba(255, 255, 255, 0.05); /* Very subtle gray for metrics */
     border-radius: 8px;
     padding: 10px;
     text-align: center;
-    border: 1px solid #333333;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     transition: transform 0.2s ease-in-out, border-color 0.2s ease-in-out;
 }
 .stMetric:hover {
     transform: translateY(-3px);
-    border: 1px solid #00BFFF; /* Electric blue hover effect */
+    border: 1px solid #007BFF; /* Blue glow on hover */
 }
 .stMetric .st-bd .st-b5 {
-    color: #FFFFFF !important; /* Make metric value white for visibility */
+    color: #FFFFFF !important; /* Make metric value pure white */
     font-size: 2em;
     font-weight: 700;
 }
 .stMetric .st-bd .st-at {
-    color: #d3d3d3 !important; /* Lighter gray for label */
+    color: #B0B0B0 !important; /* Light gray for labels */
 }
 
 /* Color coding for metrics */
 .stMetric.bullish {
-    border-left: 5px solid #32CD32; /* Lime green border */
+    border-left: 5px solid #28A745; /* Bright green border */
 }
 .stMetric.bearish {
-    border-left: 5px solid #FF00FF; /* Bold magenta border */
+    border-left: 5px solid #DC3545; /* Bright red border */
 }
 .stMetric.neutral {
-    border-left: 5px solid #00BFFF; /* Electric blue border for neutrality */
+    border-left: 5px solid #6c757d; /* Gray for neutrality */
 }
 
 /* Font and text color */
@@ -83,16 +84,16 @@ html, body, .st-emotion-cache-12oz5g7, .st-emotion-cache-1r651o3 {
 
 /* Headings */
 h1, h2, h3, h4, h5, h6 {
-    color: #00BFFF; /* Electric blue for headings */
-    border-bottom: 2px solid #00BFFF;
+    color: #007BFF; /* Blue for headings */
+    border-bottom: 2px solid #007BFF;
     padding-bottom: 5px;
     margin-bottom: 15px;
 }
 
 /* Buttons */
 .stButton>button {
-    background-color: #00BFFF; /* Electric blue button */
-    color: #0D0D0D; /* Dark text on button */
+    background-color: #007BFF;
+    color: #FFFFFF;
     font-weight: bold;
     border-radius: 8px;
     border: none;
@@ -100,7 +101,7 @@ h1, h2, h3, h4, h5, h6 {
     transition: background-color 0.2s ease-in-out;
 }
 .stButton>button:hover {
-    background-color: #0080FF;
+    background-color: #0056b3;
 }
 
 /* Special styles for main headers */
@@ -115,6 +116,21 @@ h1, h2, h3, h4, h5, h6 {
 }
 </style>
 """, unsafe_allow_html=True)
+
+# ----------------------------
+# HTTP helper with retries
+# ----------------------------
+def okx_get(path, params=None, retries=3, delay=0.6):
+    url = f"{OKX_BASE}{path}"
+    for i in range(retries):
+        try:
+            r = requests.get(url, params=params, timeout=10)
+            if r.status_code == 200:
+                return r.json()
+        except Exception:
+            pass
+        time.sleep(delay * (i + 1))
+    return None
 
 # ----------------------------
 # Data fetchers (cached)
