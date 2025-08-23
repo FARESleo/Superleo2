@@ -5,17 +5,51 @@ import numpy as np
 import time
 from math import isnan
 from datetime import datetime, timezone
-try:
-    from zoneinfo import ZoneInfo  # Python 3.9+
-    LOCAL_TZ = ZoneInfo("Africa/Algiers")
-except Exception:
-    LOCAL_TZ = None  # fallback to UTC if zoneinfo not available
+from zoneinfo import ZoneInfo
 
 OKX_BASE = "https://www.okx.com"
+LOCAL_TZ = ZoneInfo("Africa/Algiers")
 
-# ----------------------------
+# ==============================
+# Utils: formatting
+# ==============================
+def format_price(x):
+    if x is None:
+        return "N/A"
+    try:
+        x = float(x)
+        if x >= 1000:
+            return f"{x:,.2f}"
+        elif x >= 1:
+            return f"{x:,.3f}"
+        else:
+            return f"{x:.6f}".rstrip("0").rstrip(".") if "." in f"{x:.6f}" else f"{x:.6f}"
+    except:
+        return str(x)
+
+def format_num(x, decimals=3):
+    if x is None:
+        return "N/A"
+    try:
+        return f"{float(x):.{decimals}f}"
+    except:
+        return str(x)
+
+def clamp01(v):
+    try:
+        return max(0.0, min(1.0, float(v)))
+    except:
+        return 0.5
+
+def utc_now_str():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+def local_now_str():
+    return datetime.now(LOCAL_TZ).strftime("%Y-%m-%d %H:%M:%S")
+
+# ==============================
 # HTTP helper with retries
-# ----------------------------
+# ==============================
 def okx_get(path, params=None, retries=3, delay=0.6):
     url = f"{OKX_BASE}{path}"
     for i in range(retries):
@@ -28,9 +62,9 @@ def okx_get(path, params=None, retries=3, delay=0.6):
         time.sleep(delay * (i + 1))
     return None
 
-# ----------------------------
+# ==============================
 # Data fetchers (cached)
-# ----------------------------
+# ==============================
 @st.cache_data(ttl=600)
 def fetch_instruments(inst_type="SWAP"):
     j = okx_get("/api/v5/public/instruments", {"instType": inst_type})
@@ -38,18 +72,16 @@ def fetch_instruments(inst_type="SWAP"):
         return []
     return [d["instId"] for d in j["data"]]
 
-@st.cache_data(ttl=60)
-def fetch_ohlcv(instId, bar="1H", limit=200):
+@st.cache_data(ttl=45)
+def fetch_ohlcv(instId, bar="1H", limit=300):
     j = okx_get("/api/v5/market/candles", {"instId": instId, "bar": bar, "limit": str(limit)})
     if not j or "data" not in j:
         return pd.DataFrame()
     df = pd.DataFrame(j["data"], columns=["ts","o","h","l","c","vol","v2","v3","confirm"])
     for col in ["o","h","l","c","vol"]:
-        df[col] = pd.to_numeric(df[col], errors="coerce").astype(float)
-    df["ts"] = pd.to_numeric(df["ts"], errors="coerce")
-    df.dropna(subset=["ts"], inplace=True)
-    df["ts"] = pd.to_datetime(df["ts"].astype(int), unit="ms", utc=True)
-    df = df.iloc[::-1].reset_index(drop=True)
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    df["ts"] = pd.to_datetime(pd.to_numeric(df["ts"], errors="coerce"), unit="ms", utc=True)
+    df = df.dropna(subset=["o","h","l","c","ts"]).iloc[::-1].reset_index(drop=True)
     return df
 
 @st.cache_data(ttl=20)
@@ -76,6 +108,7 @@ def fetch_oi(instId):
     except Exception:
         return None
 
+# Robust orderbook: handle rows of length 2 or 3, avoid ValueError
 @st.cache_data(ttl=30)
 def fetch_orderbook(instId, depth=60):
     j = okx_get("/api/v5/market/books", {"instId": instId, "sz": str(depth)})
@@ -89,15 +122,15 @@ def fetch_orderbook(instId, depth=60):
             if df.shape[1] == 2:
                 df.columns = ["price","size"]
             elif df.shape[1] >= 3:
-                df = df.iloc[:, :3]
+                df = df.iloc[:,:3]
                 df.columns = ["price","size","liq"]
             else:
                 return pd.DataFrame()
             df["price"] = pd.to_numeric(df["price"], errors="coerce")
-            df["size"]  = pd.to_numeric(df["size"],  errors="coerce")
+            df["size"] = pd.to_numeric(df["size"], errors="coerce")
             if "liq" in df.columns:
                 df["liq"] = pd.to_numeric(df["liq"], errors="coerce")
-            df.dropna(subset=["price","size"], inplace=True)
+            df = df.dropna(subset=["price","size"])
             df["side"] = side
             return df
         except Exception:
@@ -115,25 +148,29 @@ def fetch_trades(instId, limit=400):
     df = pd.DataFrame(j["data"])
     # normalize columns
     if "px" not in df.columns and "price" in df.columns:
-        df.rename(columns={"price":"px"}, inplace=True)
+        df = df.rename(columns={"price": "px"})
     if "sz" not in df.columns and "size" in df.columns:
-        df.rename(columns={"size":"sz"}, inplace=True)
+        df = df.rename(columns={"size": "sz"})
     try:
-        df["px"] = pd.to_numeric(df["px"], errors="coerce")
-        df["sz"] = pd.to_numeric(df["sz"], errors="coerce")
-        df["ts"] = pd.to_numeric(df["ts"], errors="coerce")
-        df["side"] = df["side"].astype(str)
+        df["px"] = pd.to_numeric(df["px"], errors='coerce')
+        df["sz"] = pd.to_numeric(df["sz"], errors='coerce')
+        df["ts"] = pd.to_numeric(df["ts"], errors='coerce')
         df.dropna(subset=["px","sz","ts"], inplace=True)
-        df["ts"] = pd.to_datetime(df["ts"].astype(int), unit="ms", utc=True)
+        df["ts"] = pd.to_datetime(df["ts"].astype(int), unit="ms", utc=True, errors='coerce')
+        df.dropna(subset=["ts"], inplace=True)
+        if "side" in df.columns:
+            df["side"] = df["side"].astype(str)
+        else:
+            df["side"] = "buy"
     except Exception:
         return pd.DataFrame()
     return df.sort_values("ts").reset_index(drop=True)
 
-# ----------------------------
-# Metrics & helpers
-# ----------------------------
+# ==============================
+# Metrics & signals
+# ==============================
 def compute_cvd(trades_df):
-    if trades_df.empty:
+    if trades_df is None or trades_df.empty:
         return None
     signed = np.where(trades_df["side"].str.lower()=="buy", trades_df["sz"], -trades_df["sz"])
     return float(np.nansum(signed))
@@ -145,16 +182,15 @@ def orderbook_imbalance(bids, asks):
     ask_vol = asks["size"].sum()
     return float((bid_vol - ask_vol) / (bid_vol + ask_vol + 1e-9))
 
-def find_liquidity_zones(bids_df, asks_df, price_range_pct=0.01):
+def find_liquidity_zones(bids_df, asks_df, price_range_pct=0.01, top_n=3):
     if bids_df is None or asks_df is None or bids_df.empty or asks_df.empty:
         return [], []
-    # mid price approx from best quotes
-    current_price = (bids_df["price"].max() + asks_df["price"].min()) / 2.0
-    bid_zones = bids_df[bids_df["price"] > current_price * (1 - price_range_pct)]
-    ask_zones = asks_df[asks_df["price"] < current_price * (1 + price_range_pct)]
-    top_bids = bid_zones.nlargest(5, "size")[["price","size"]].round(6).to_dict('records')
-    top_asks = ask_zones.nlargest(5, "size")[["price","size"]].round(6).to_dict('records')
-    return top_bids, top_asks
+    mid = (bids_df["price"].iloc[0] + asks_df["price"].iloc[0]) / 2.0
+    bid_z = bids_df[bids_df["price"] > mid * (1 - price_range_pct)]
+    ask_z = asks_df[asks_df["price"] < mid * (1 + price_range_pct)]
+    tb = bid_z.nlargest(top_n, "size")[["price","size"]].to_dict("records")
+    ta = ask_z.nlargest(top_n, "size")[["price","size"]].to_dict("records")
+    return tb, ta
 
 def simple_backtest_winrate(ohlcv_df, lookahead=6, stop_pct=0.01, rr=2.0):
     if ohlcv_df.empty or len(ohlcv_df) < 80:
@@ -189,29 +225,30 @@ def simple_backtest_winrate(ohlcv_df, lookahead=6, stop_pct=0.01, rr=2.0):
 def compute_support_resistance(ohlcv_df, window=20):
     if ohlcv_df.empty:
         return None, None
-    recent = ohlcv_df[-window:]
-    support = float(recent["l"].min())
-    resistance = float(recent["h"].max())
-    return support, resistance
+    recent = ohlcv_df.tail(window)
+    return float(recent["l"].min()), float(recent["h"].max())
 
 def detect_candle_signal(ohlcv_df, bar):
     if ohlcv_df.empty or len(ohlcv_df) < 3:
         return None
     last = ohlcv_df.iloc[-1]
     prev = ohlcv_df.iloc[-2]
+
     # Engulfing
-    if last["c"] > last["o"] and prev["c"] < prev["o"] and last["c"] > prev["o"] and last["o"] < prev["c"]:
+    if last["c"] > last["o"] and prev["c"] < prev["o"] and (last["c"] >= prev["o"]) and (last["o"] <= prev["c"]):
         return "Bullish Engulfing"
-    if last["c"] < last["o"] and prev["c"] > prev["o"] and last["c"] < prev["o"] and last["o"] > prev["c"]:
+    if last["c"] < last["o"] and prev["c"] > prev["o"] and (last["c"] <= prev["o"]) and (last["o"] >= prev["c"]):
         return "Bearish Engulfing"
-    # Simple Morning Star (compact)
-    if bar in ["5m", "15m", "1H"] and len(ohlcv_df) >= 3:
-        prev2 = ohlcv_df.iloc[-3]
-        is_bearish_prev2 = prev2["c"] < prev2["o"]
-        is_small_body_prev = abs(prev["o"] - prev["c"]) < ((prev["h"] - prev["l"]) * 0.2 + 1e-9)
-        is_bullish_last = last["c"] > last["o"]
-        if is_bearish_prev2 and is_small_body_prev and is_bullish_last:
-            return "Bullish Morning Star"
+
+    # Morning Star (approx on lower TFs)
+    if bar in ["5m","15m","1H"]:
+        if len(ohlcv_df) >= 3:
+            prev2 = ohlcv_df.iloc[-3]
+            is_bear2 = prev2["c"] < prev2["o"]
+            is_small_prev = abs(prev["o"] - prev["c"]) < ((prev["h"] - prev["l"]) * 0.2)
+            is_bull_last = last["c"] > last["o"]
+            if is_bear2 and is_small_prev and is_bull_last:
+                return "Bullish Morning Star"
     return None
 
 def calculate_atr(ohlcv_df, period=14):
@@ -225,13 +262,13 @@ def calculate_atr(ohlcv_df, period=14):
     tr2 = (high - close.shift(1)).abs()
     tr3 = (low - close.shift(1)).abs()
     tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-    atr = tr.rolling(period).mean().iloc[-1]
-    return float(atr)
+    return float(tr.rolling(period).mean().iloc[-1])
 
-# ----------------------------
-# Confidence + Trade suggestion
-# ----------------------------
+# ==============================
+# Confidence + trade suggestion
+# ==============================
 def compute_confidence(instId, bar="1H"):
+    # fetch
     ohlcv = fetch_ohlcv(instId, bar, limit=300)
     price = fetch_ticker(instId)
     funding = fetch_funding(instId)
@@ -239,189 +276,217 @@ def compute_confidence(instId, bar="1H"):
     bids, asks = fetch_orderbook(instId, depth=60)
     trades = fetch_trades(instId, limit=400)
 
+    # derived
     cvd = compute_cvd(trades)
     ob_imb = orderbook_imbalance(bids, asks)
-    top_bids, top_asks = find_liquidity_zones(bids, asks)
+    top_bids, top_asks = find_liquidity_zones(bids, asks, top_n=3)
     bt_win = simple_backtest_winrate(ohlcv, lookahead=6, stop_pct=0.01, rr=2.0)
     support, resistance = compute_support_resistance(ohlcv)
     candle_signal = detect_candle_signal(ohlcv, bar)
     atr = calculate_atr(ohlcv, period=14)
 
-    # Normalize metrics -> 0..1
-    fund_score = 0.5 + np.tanh((funding or 0.0)*500)/2 if funding is not None else 0.5
-    oi_score   = 0.5 + np.tanh(np.log1p(max(oi,0.0))/20.0)/2 if oi is not None else 0.5
-    cvd_score  = 0.5 + np.tanh((cvd or 0.0)/1e4)/2 if cvd is not None else 0.5
-    ob_score   = ((ob_imb or 0.0)+1)/2 if ob_imb is not None else 0.5
+    # Normalize to 0..1
+    fund_score = 0.5 + np.tanh((funding or 0.0) * 500.0)/2.0 if funding is not None else 0.5
+    oi_score   = 0.5 + np.tanh(np.log1p(max(0.0,(oi or 0.0))) / 20.0)/2.0 if oi is not None else 0.5
+    cvd_score  = 0.5 + np.tanh((cvd or 0.0) / 1e4)/2.0 if cvd is not None else 0.5
+    ob_score   = ((ob_imb or 0.0) + 1.0)/2.0 if ob_imb is not None else 0.5
     bt_score   = bt_win if bt_win is not None else 0.5
 
-    metrics = {"funding": fund_score, "oi": oi_score, "cvd": cvd_score, "orderbook": ob_score, "backtest": bt_score}
+    metrics = {
+        "funding": clamp01(fund_score),
+        "oi": clamp01(oi_score),
+        "cvd": clamp01(cvd_score),
+        "orderbook": clamp01(ob_score),
+        "backtest": clamp01(bt_score),
+    }
+
     weights = {"backtest":0.30, "orderbook":0.25, "cvd":0.20, "oi":0.15, "funding":0.10}
+    conf = sum(metrics[k]*weights[k] for k in metrics.keys())
+    confidence_pct = round(max(0.0, min(conf*100.0, 100.0)), 1)
 
-    # clamp + weighted sum
-    for k in metrics:
-        v = metrics[k]
-        if not isinstance(v, (float, int)) or np.isnan(v):
-            metrics[k] = 0.5
-        else:
-            metrics[k] = float(min(1.0, max(0.0, v)))
+    # classify
+    if confidence_pct >= 65:
+        bias = "bull"
+    elif confidence_pct <= 35:
+        bias = "bear"
+    else:
+        bias = "neutral"
 
-    conf = sum(metrics[k]*weights[k] for k in metrics)
-    confidence_pct = round(float(max(0.0, min(conf*100.0, 100.0))), 1)
+    # Signal strength rules
+    is_bullish_strong = (
+        bias == "bull" and
+        (cvd is not None and cvd > 0) and
+        (ob_imb is not None and ob_imb > 0) and
+        (candle_signal in ["Bullish Engulfing","Bullish Morning Star"])
+    )
+    is_bullish_weak = (
+        (confidence_pct >= 50) and
+        ((cvd is not None and cvd > 0) or (candle_signal in ["Bullish Engulfing","Bullish Morning Star"]))
+    )
+    is_bearish_strong = (
+        bias == "bear" and
+        (cvd is not None and cvd < 0) and
+        (ob_imb is not None and ob_imb < 0) and
+        (candle_signal == "Bearish Engulfing")
+    )
+    is_bearish_weak = (
+        (confidence_pct <= 50) and
+        ((cvd is not None and cvd < 0) or (candle_signal == "Bearish Engulfing"))
+    )
 
-    # Build recommendation logic
+    # Trade plan
     if atr is None or price is None:
         label = "⚠️ Neutral / Mixed"
         recommendation = "Wait"
         strength = "N/A"
         entry = price
         target = stop = None
-        reason = "بيانات غير كافية (ATR أو السعر مفقود)."
+        reason = "بيانات غير كافية (ATR/Price)."
+        color = "gray"
+        icon = "⏸️"
     else:
-        bullish_strong = (confidence_pct >= 65) and (cvd or 0) > 0 and (ob_imb or 0) > 0 and (candle_signal in ["Bullish Engulfing","Bullish Morning Star"])
-        bullish_weak   = (confidence_pct >= 50) and (((cvd or 0) > 0) or (candle_signal in ["Bullish Engulfing","Bullish Morning Star"]))
-
-        bearish_strong = (confidence_pct <= 35) and (cvd or 0) < 0 and (ob_imb or 0) < 0 and (candle_signal == "Bearish Engulfing")
-        bearish_weak   = (confidence_pct <= 50) and (((cvd or 0) < 0) or (candle_signal == "Bearish Engulfing"))
-
-        if bullish_strong:
-            label = "📈 Bullish"
-            recommendation = "LONG"
-            strength = "Strong"
+        if is_bullish_strong:
+            label, recommendation, strength, color, icon = "📈 Bullish", "LONG", "Strong", "green", "🚀"
             entry = price
-            target = round(entry + (atr * 2.0), 6)
-            stop   = round(entry - (atr * 1.0), 6)
-            reason = "Confluence قوي: شمعة انعكاسية + CVD إيجابي + ميزان دفتر الأوامر لصالح المشترين."
-        elif bullish_weak:
-            label = "📈 Bullish"
-            recommendation = "LONG"
-            strength = "Weak"
+            target = entry + (atr * 2.0)
+            stop   = entry - (atr * 1.0)
+            reason = f"Confluence قوي: {candle_signal} + CVD إيجابي + ميزان العُمق لصالح المشترين."
+        elif is_bullish_weak:
+            label, recommendation, strength, color, icon = "📈 Bullish", "LONG", "Weak", "green", "🟢"
             entry = price
-            target = round(entry + (atr * 1.5), 6)
-            stop   = round(entry - (atr * 1.0), 6)
-            reason = "Confluence متوسط: إحدى الإشارات صعودية (شموع أو CVD) بينما بقية الإشارات مختلطة."
-        elif bearish_strong:
-            label = "📉 Bearish"
-            recommendation = "SHORT"
-            strength = "Strong"
+            target = entry + (atr * 1.5)
+            stop   = entry - (atr * 1.0)
+            reason = f"ميل صعودي: {candle_signal or 'لا توجد شمعة قوية'} أو CVD إيجابي، لكن الإشارات مختلطة."
+        elif is_bearish_strong:
+            label, recommendation, strength, color, icon = "📉 Bearish", "SHORT", "Strong", "red", "🔻"
             entry = price
-            target = round(entry - (atr * 2.0), 6)
-            stop   = round(entry + (atr * 1.0), 6)
-            reason = "Confluence قوي: شمعة هبوطية + CVD سلبي + ميزان دفتر الأوامر لصالح البائعين."
-        elif bearish_weak:
-            label = "📉 Bearish"
-            recommendation = "SHORT"
-            strength = "Weak"
+            target = entry - (atr * 2.0)
+            stop   = entry + (atr * 1.0)
+            reason = f"Confluence قوي: {candle_signal} + CVD سلبي + ميزان العُمق لصالح البائعين."
+        elif is_bearish_weak:
+            label, recommendation, strength, color, icon = "📉 Bearish", "SHORT", "Weak", "red", "🟥"
             entry = price
-            target = round(entry - (atr * 1.5), 6)
-            stop   = round(entry + (atr * 1.0), 6)
-            reason = "Confluence متوسط: إحدى الإشارات هبوطية (شموع أو CVD) بينما بقية الإشارات مختلطة."
+            target = entry - (atr * 1.5)
+            stop   = entry + (atr * 1.0)
+            reason = f"ميل هبوطي: {candle_signal or 'لا توجد شمعة قوية'} أو CVD سلبي، لكن الإشارات مختلطة."
         else:
-            label = "⚠️ Neutral / Mixed"
-            recommendation = "Wait"
-            strength = "Neutral"
+            label, recommendation, strength, color, icon = "⚠️ Neutral / Mixed", "Wait", "Neutral", "gray", "⏸️"
             entry = price
             target = stop = None
-            reason = "الإشارات متضاربة — لا يوجد سبب قوي للدخول الآن."
-
-    # raw details
-    last_bar_time_utc = None
-    if not fetch_ohlcv(instId, bar, 1).empty:
-        last_bar_time_utc = fetch_ohlcv(instId, bar, 1)["ts"].iloc[-1]
+            reason = "لا يوجد سبب مقنع للدخول الآن. انتظر مزيداً من التوافق بين الإشارات."
 
     raw = {
-        "price": price, "funding": funding, "oi": oi, "cvd": cvd,
-        "orderbook_imbalance": ob_imb, "backtest_win": bt_win,
-        "support": support, "resistance": resistance,
-        "candle_signal": candle_signal, "atr": atr,
-        "top_bids": top_bids, "top_asks": top_asks,
-        "last_bar_time_utc": str(last_bar_time_utc) if last_bar_time_utc is not None else None
+        "price": price,
+        "funding": funding,
+        "oi": oi,
+        "cvd": cvd,
+        "orderbook_imbalance": ob_imb,
+        "backtest_win": bt_win,
+        "support": support,
+        "resistance": resistance,
+        "candle_signal": candle_signal,
+        "atr": atr,
+        "top_bids": top_bids,
+        "top_asks": top_asks
     }
 
     return {
-        "label": label, "confidence_pct": confidence_pct, "recommendation": recommendation,
-        "strength": strength, "entry": entry, "target": target, "stop": stop,
-        "metrics": metrics, "weights": weights, "raw": raw
+        "label": label,
+        "icon": icon,
+        "color": color,
+        "confidence_pct": confidence_pct,
+        "recommendation": recommendation,
+        "strength": strength,
+        "entry": entry,
+        "target": target,
+        "stop": stop,
+        "metrics": metrics,
+        "weights": {"funding":0.10,"oi":0.15,"cvd":0.20,"orderbook":0.25,"backtest":0.30},
+        "raw": raw,
+        "reason": reason
     }
 
-# ----------------------------
+# ==============================
 # Streamlit UI
-# ----------------------------
+# ==============================
 st.set_page_config(page_title="Smart Money Scanner V3.8", layout="wide")
-st.title("🧠 Smart Money Scanner V3.8 — Flexible Signals + Local Time")
+st.title("🧠 Smart Money Scanner V3.8 — Integrated Signals + Trade Suggestion (OKX)")
 
-# Time block (UTC + Local)
-now_utc = datetime.now(timezone.utc)
-if LOCAL_TZ:
-    now_local = now_utc.astimezone(LOCAL_TZ)
-    st.caption(f"⏰ Time (UTC): {now_utc.strftime('%Y-%m-%d %H:%M:%S')} | Local ({LOCAL_TZ.key}): {now_local.strftime('%Y-%m-%d %H:%M:%S')}")
-else:
-    st.caption(f"⏰ Time (UTC): {now_utc.strftime('%Y-%m-%d %H:%M:%S')} | Local: (UTC fallback)")
-
-# Sidebar controls
-inst_type = st.sidebar.selectbox("Instrument Type", ["SWAP", "SPOT"], index=0)
+# Sidebar inputs
+inst_type = st.sidebar.selectbox("Instrument Type", ["SWAP","SPOT"])
 instruments = fetch_instruments(inst_type)
 if not instruments:
-    st.sidebar.error("Unable to load instruments from OKX.")
+    st.sidebar.error("Unable to load instruments from OKX. تحقق من الاتصال.")
     st.stop()
-instId = st.sidebar.selectbox("Instrument", instruments, index=0)
-bar = st.sidebar.selectbox("Timeframe", ["5m","15m","1H","4H","1D"], index=2)
-show_raw = st.sidebar.checkbox("Advanced: Show Raw Metrics", value=False)
 
-# Compute
-if st.sidebar.button("Compute Confidence"):
-    with st.spinner("Computing — gathering live data..."):
+default_inst = "BTC-USDT-SWAP" if inst_type=="SWAP" else instruments[0]
+instId = st.sidebar.selectbox("Instrument", instruments, index=instruments.index(default_inst) if default_inst in instruments else 0)
+bar = st.sidebar.selectbox("Timeframe", ["5m","15m","1H","4H","1D"], index=2)
+show_raw = st.sidebar.checkbox("Show Raw metrics (Advanced)", value=False)
+
+if st.sidebar.button("🚀 Run Analysis"):
+    with st.spinner("Fetching & computing…"):
         result = compute_confidence(instId, bar)
 
-    # Top summary
+    # Header summary
     st.subheader(f"{result['label']} — Confidence: {result['confidence_pct']}%")
-    st.metric("Live Price", f"{result['raw']['price']:,}" if result['raw']['price'] else "N/A")
+    st.markdown(
+        f"<h4 style='color:{result['color']}; margin-top:0'>"
+        f"{result['icon']} {result['recommendation']} — {result['strength']}"
+        f"</h4>",
+        unsafe_allow_html=True
+    )
 
-    # Metrics
+    # Times
+    st.caption(f"Last Updated (Local – Africa/Algiers): {local_now_str()}  |  UTC: {utc_now_str()}")
+
+    # Live price
+    st.metric("💵 Live Price", format_price(result["raw"]["price"]))
+
+    # Metrics cards
     st.markdown("### 📊 Core Metrics")
     icons = {"funding":"💰","oi":"📊","cvd":"📈","orderbook":"⚖️","backtest":"🧪"}
     cols = st.columns(5)
     order = ["funding","oi","cvd","orderbook","backtest"]
     for i, k in enumerate(order):
-        val = result["metrics"][k]
-        w = result["weights"][k]
-        contrib = round(val*w*100, 2)
+        score = result["metrics"][k]
+        weight = result["weights"][k]
+        contrib = round(score*weight*100, 2)
         with cols[i]:
-            st.metric(label=f"{icons[k]} {k.upper()}", value=f"{val:.3f}", delta=f"w={w}")
+            st.metric(label=f"{icons[k]} {k.upper()}", value=f"{score:.3f}", delta=f"w={weight}")
             st.caption(f"Contribution: {contrib}%")
 
-    # Trade Suggestion
-    st.markdown("### 📝 Trade Suggestion")
-    st.markdown(f"**Action:** {result['recommendation']} ({result['strength']})")
-    st.markdown(f"**Entry:** {result['entry'] if result['entry'] is not None else 'N/A'}")
-    st.markdown(f"**Target:** {result['target'] if result['target'] is not None else 'N/A'}")
-    st.markdown(f"**Stop:** {result['stop'] if result['stop'] is not None else 'N/A'}")
-    st.markdown(f"**Why:** { ' '.join([str(result['label']), '-', str(result['recommendation'])]) } — { ' '.join([str(result.get('strength',''))]) }")
-    st.markdown(f"**Reason:** {result.get('reason','')}")
+    # Trade plan
+    st.markdown("---")
+    st.markdown("### 📝 Trade Plan")
+    st.write("**Why:**", result["reason"])
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Entry", format_price(result["entry"]))
+    c2.metric("Target", format_price(result["target"]) if result["target"] else "N/A")
+    c3.metric("Stop", format_price(result["stop"]) if result["stop"] else "N/A")
 
-    # Structure & Candles
-    st.markdown("### 🔎 Structure & Candles")
-    sup = result["raw"]["support"]; res = result["raw"]["resistance"]
-    st.markdown(f"• **Support:** {f'{sup:,}' if isinstance(sup,(float,int)) else 'N/A'}    \n• **Resistance:** {f'{res:,}' if isinstance(res,(float,int)) else 'N/A'}")
-    st.markdown(f"• **Candle signals:** {result['raw']['candle_signal'] if result['raw']['candle_signal'] else 'None'}")
-
-    # Liquidity snapshot (text only)
+    # Extra info (no charts)
+    st.markdown("---")
+    st.markdown("### 🔍 Structure & Orderflow")
+    support = result["raw"]["support"]
+    resistance = result["raw"]["resistance"]
+    st.write(f"• **Support (approx):** {format_price(support)}  |  **Resistance (approx):** {format_price(resistance)}")
+    st.write(f"• **Candle signal:** {result['raw']['candle_signal'] or 'None'}")
+    # compact liquidity snapshot
     tb = result["raw"]["top_bids"] or []
     ta = result["raw"]["top_asks"] or []
     if tb or ta:
-        st.markdown("### 💧 Nearby Liquidity (text)")
+        st.write("• **Liquidity (near price):**")
         if tb:
-            st.markdown("**Top Bids (near price):**")
-            for r in tb:
-                st.markdown(f"- price: {r.get('price')}, size: {r.get('size')}")
+            st.write("  - Top Bids:", ", ".join([f"{format_price(x['price'])} ({format_num(x['size'],2)})" for x in tb]))
         if ta:
-            st.markdown("**Top Asks (near price):**")
-            for r in ta:
-                st.markdown(f"- price: {r.get('price')}, size: {r.get('size')}")
+            st.write("  - Top Asks:", ", ".join([f"{format_price(x['price'])} ({format_num(x['size'],2)})" for x in ta]))
 
-    # Raw metrics (toggle)
+    # Raw metrics (optional)
     if show_raw:
-        st.markdown("### Raw metrics (for transparency)")
+        st.markdown("---")
+        st.markdown("### 📂 Raw Metrics (Advanced)")
         st.json(result["raw"])
 
 else:
-    st.info("Select instrument/timeframe and press 'Compute Confidence'.")
+    st.info("اختر الأداة والإطار الزمني من الشريط الجانبي ثم اضغط “🚀 Run Analysis”.")
