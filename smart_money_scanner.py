@@ -460,6 +460,8 @@ if 'bar' not in st.session_state:
     st.session_state.bar = "1H"
 if 'show_calculator' not in st.session_state:
     st.session_state.show_calculator = False
+if 'selected_leverage' not in st.session_state:
+    st.session_state.selected_leverage = None
 
 # Fetch all instruments once
 all_instruments = fetch_instruments("SWAP") + fetch_instruments("SPOT")
@@ -501,6 +503,7 @@ with header_col2:
         
 def toggle_calculator():
     st.session_state.show_calculator = not st.session_state.show_calculator
+    st.session_state.selected_leverage = None # Reset leverage when opening/closing
 
 with header_col3:
     st.markdown("""
@@ -731,8 +734,6 @@ if st.session_state.analysis_results:
     st.markdown("---")
     st.markdown("### 📊 المقاييس الأساسية")
     
-    # ***هذا هو الكود المحدث لحل المشكلة***
-    
     metrics_data = {
         "funding": {"label": "التمويل", "value": result["metrics"]["funding"], "weight": result["weights"]["funding"]},
         "oi": {"label": "OI", "value": result["metrics"]["oi"], "weight": result["weights"]["oi"]},
@@ -743,7 +744,6 @@ if st.session_state.analysis_results:
 
     icons = {"funding":"💰","oi":"📊","cvd":"📈","orderbook":"⚖️","backtest":"🧪"}
     
-    # هنا تم إضافة حلقة التكرار لإنشاء الأعمدة والمقاييس داخلها
     cols = st.columns(len(metrics_data))
 
     for idx, k in enumerate(metrics_data):
@@ -752,7 +752,6 @@ if st.session_state.analysis_results:
             weight = metrics_data[k]["weight"]
             contrib = round(score * weight * 100, 2)
             
-            # هنا يتم عرض المقياس بشكل صحيح داخل كل عمود
             st.metric(label=f"{icons[k]} {metrics_data[k]['label']}", value=f"{score:.3f}", delta=f"w={weight}")
             st.caption(f"Contribution: {contrib}%")
 
@@ -770,384 +769,108 @@ if st.session_state.analysis_results:
 else:
     st.info("حدد الأداة/الإطار الزمني واضغط 'انطلق' للبدء.")
 
-# The Trading Calculator HTML Code
-calculator_html = """
-<!DOCTYPE html>
-<html lang="ar">
-<head>
-  <meta charset="UTF-8">
-  <title>حاسبة التداول المتقدمة</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    :root {
-      --bg-color: #0d1117;
-      --card-bg: #161b22;
-      --input-bg: #21262d;
-      --text-color: #c9d1d9;
-      --primary-color: #58a6ff;
-      --success-color: #3fb950;
-      --danger-color: #f85149;
-    }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      background: var(--bg-color);
-      color: var(--text-color);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      margin: 0;
-      direction: rtl;
-    }
-    .card {
-      background: var(--card-bg);
-      padding: 30px;
-      border-radius: 20px;
-      width: 500px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-      border: 1px solid #30363d;
-      max-width: 90%;
-    }
-    h2 {
-      text-align: center;
-      margin-bottom: 25px;
-      color: var(--primary-color);
-      font-weight: 600;
-    }
-    label {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin: 15px 0 5px;
-      font-size: 14px;
-      font-weight: 500;
-    }
-    .tooltip-icon {
-      font-weight: bold;
-      color: var(--primary-color);
-      cursor: pointer;
-      font-size: 16px;
-      position: relative;
-    }
-    .tooltip-text {
-      visibility: hidden;
-      width: 200px;
-      background-color: var(--input-bg);
-      color: var(--text-color);
-      text-align: center;
-      border-radius: 6px;
-      padding: 10px;
-      position: absolute;
-      z-index: 1;
-      right: 0;
-      top: 120%;
-      opacity: 0;
-      transition: opacity 0.3s;
-      font-size: 12px;
-      line-height: 1.5;
-      border: 1px solid #444c56;
-    }
-    .tooltip-icon:hover .tooltip-text {
-      visibility: visible;
-      opacity: 1;
-    }
-    input, select {
-      width: 100%;
-      padding: 12px;
-      border: 1px solid var(--input-bg);
-      border-radius: 10px;
-      background: var(--input-bg);
-      color: var(--text-color);
-      transition: border-color 0.2s, box-shadow 0.2s;
-    }
-    input:focus, select:focus {
-      outline: none;
-      border-color: var(--primary-color);
-      box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.2);
-    }
-    .btn-group {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 20px;
-    }
-    .btn-group button {
-      flex: 1;
-      padding: 10px;
-      background: var(--input-bg);
-      border: 1px solid #444c56;
-      border-radius: 8px;
-      color: var(--text-color);
-      cursor: pointer;
-      font-size: 14px;
-      transition: background 0.2s, border-color 0.2s;
-    }
-    .btn-group button.active, .btn-group button:hover {
-      background: var(--primary-color);
-      border-color: var(--primary-color);
-      color: #fff;
-    }
-    #calculateBtn {
-      width: 100%;
-      padding: 15px;
-      background: var(--primary-color);
-      border: none;
-      border-radius: 12px;
-      color: var(--bg-color);
-      font-weight: bold;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    #calculateBtn:hover {
-      background: #478bff;
-    }
-    .results {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 15px;
-      margin-top: 25px;
-    }
-    .box {
-      background: var(--input-bg);
-      padding: 15px;
-      border-radius: 12px;
-      text-align: center;
-      font-weight: 500;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 70px;
-    }
-    .box-label {
-      font-size: 12px;
-      color: #8b949e;
-      margin-bottom: 5px;
-    }
-    .box-value {
-      font-size: 18px;
-      font-weight: bold;
-    }
-    .profit { color: var(--success-color); } 
-    .loss { color: var(--danger-color); } 
-    .info { color: var(--primary-color); }
-    canvas {
-      margin-top: 25px;
-      background-color: #21262d;
-      border-radius: 12px;
-      padding: 15px;
-      border: 1px solid #30363d;
-    }
-    .close-btn {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        background: #f85149;
-        color: white;
-        border: none;
-        border-radius: 50%;
-        width: 30px;
-        height: 30px;
-        font-size: 20px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    /* Mobile Responsiveness */
-    @media (max-width: 600px) {
-        .card {
-            width: 100%;
-            padding: 20px;
-            border-radius: 0;
-            box-shadow: none;
+# ----------------------------------------------------
+# 🌟 الحاسبة الجديدة (كود بايثون) 🌟
+# ----------------------------------------------------
+def trading_calculator_app():
+    """
+    Creates and manages the trading calculator UI using pure Streamlit.
+    """
+    
+    imr = st.number_input("الهامش المبدئي (IMR %)", min_value=0.01, value=2.0, step=0.1, help="النسبة المئوية من إجمالي قيمة الصفقة التي تودعها.")
+    mmr = st.number_input("هامش الحِفاظ (MMR %)", min_value=0.01, value=1.0, step=0.1, help="الحد الأدنى من الهامش المطلوب للحفاظ على الصفقة.")
+    
+    # Logic to determine max leverage
+    if imr > mmr and imr > 0:
+        margin_diff = imr - mmr
+        max_leverage = round(100 / margin_diff, 2)
+        leverage_options = {
+            "5x (منخفضة)": 5,
+            "10x (منخفضة)": 10,
+            "20x (متوسطة)": 20,
+            "30x (متوسطة)": 30,
+            "50x (عالية)": 50,
+            "100x (عالية جداً)": 100,
+            f"{max_leverage}x (القصوى)": max_leverage
         }
-        .btn-group {
-            flex-direction: column;
-        }
-        .btn-group button {
-            width: 100%;
-        }
-        .results {
-            grid-template-columns: 1fr;
-        }
-    }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <h2>📊 حاسبة التداول المتقدمة</h2>
-    <label>الهامش المبدئي (IMR %)
-      <span class="tooltip-icon">i<span class="tooltip-text">النسبة المئوية من إجمالي قيمة الصفقة التي تودعها.</span></span>
-    </label>
-    <input type="number" id="imr" placeholder="مثال: 2" oninput="updateUI()">
-    <label>هامش الحِفاظ (MMR %)
-      <span class="tooltip-icon">i<span class="tooltip-text">الحد الأدنى من الهامش المطلوب للحفاظ على الصفقة.</span></span>
-    </label>
-    <input type="number" id="mmr" placeholder="مثال: 1" oninput="updateUI()">
-    <label>اختر الرافعة المالية</label>
-    <div id="leverageButtons" class="btn-group"></div>
-    <label>المبلغ (USDT)</label>
-    <input type="number" id="capital" placeholder="مثال: 10" oninput="updateUI()">
-    <label>السعر الحالي</label>
-    <input type="number" id="currentPrice" placeholder="مثال: 1.00" oninput="updateUI()">
-    <label>سعر الهدف</label>
-    <input type="number" id="targetPrice" placeholder="مثال: 1.05" oninput="updateUI()">
-    <label>الاتجاه</label>
-    <select id="direction" onchange="updateUI()">
-      <option value="long">📈 شراء (Long)</option>
-      <option value="short">📉 بيع (Short)</option>
-    </select>
-    <div class="results">
-      <div class="box info">
-        <div class="box-label">فرق الهامش</div>
-        <div class="box-value" id="marginDiff">-</div>
-      </div>
-      <div class="box info">
-        <div class="box-label">التغير %</div>
-        <div class="box-value" id="priceChangeBox">-</div>
-      </div>
-      <div class="box profit">
-        <div class="box-label">ROI %</div>
-        <div class="box-value" id="roiBox">-</div>
-      </div>
-      <div class="box info">
-        <div class="box-label">PnL USDT</div>
-        <div class="box-value" id="pnlBox">-</div>
-      </div>
-      <div class="box loss">
-        <div class="box-label">سعر التصفية</div>
-        <div class="box-value" id="liqBox">-</div>
-      </div>
-    </div>
-    <canvas id="chart" height="120"></canvas>
-  </div>
-  <script>
-    let chart;
-    let selectedLeverage = null;
-    function updateUI() {
-      updateLeverageOptions();
-      calculate();
-    }
-    function updateLeverageOptions() {
-      const imr = parseFloat(document.getElementById("imr").value);
-      const mmr = parseFloat(document.getElementById("mmr").value);
-      const btnContainer = document.getElementById("leverageButtons");
-      btnContainer.innerHTML = "";
-      if (isNaN(imr) || isNaN(mmr) || imr <= mmr || imr <= 0) {
-        selectedLeverage = null;
-        return;
-      }
-      const marginDifference = imr - mmr;
-      const maxLeverage = 100 / marginDifference;
-      const leverageOptions = [
-        { value: 5, text: `5x (منخفضة)` },
-        { value: 10, text: `10x (منخفضة)` },
-        { value: 20, text: `20x (متوسطة)` },
-        { value: 30, text: `30x (متوسطة)` },
-        { value: 50, text: `50x (عالية)` },
-        { value: 100, text: `100x (عالية جداً)` }
-      ];
-      leverageOptions.forEach(option => {
-        if (maxLeverage >= option.value) {
-          const btn = document.createElement("button");
-          btn.textContent = option.text;
-          btn.value = option.value;
-          btn.onclick = () => {
-            selectedLeverage = option.value;
-            document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            calculate();
-          };
-          btnContainer.appendChild(btn);
-        }
-      });
-      const maxBtn = document.createElement("button");
-      maxBtn.textContent = `${maxLeverage.toFixed(2)}x (القصوى)`;
-      maxBtn.value = maxLeverage;
-      maxBtn.onclick = () => {
-        selectedLeverage = maxLeverage;
-        document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
-        maxBtn.classList.add('active');
-        calculate();
-      };
-      btnContainer.appendChild(maxBtn);
-    }
-    function calculate() {
-      const imr = parseFloat(document.getElementById("imr").value);
-      const mmr = parseFloat(document.getElementById("mmr").value);
-      const capital = parseFloat(document.getElementById("capital").value);
-      const currentPrice = parseFloat(document.getElementById("currentPrice").value);
-      const targetPrice = parseFloat(document.getElementById("targetPrice").value);
-      const direction = document.getElementById("direction").value;
-      
-      if (selectedLeverage === null || [imr, mmr, capital, currentPrice, targetPrice].some(isNaN) || imr <= mmr || imr <= 0) {
-        document.getElementById("marginDiff").innerHTML = '-';
-        document.getElementById("priceChangeBox").innerHTML = '-';
-        document.getElementById("roiBox").innerHTML = '-';
-        document.getElementById("pnlBox").innerHTML = '-';
-        document.getElementById("liqBox").innerHTML = '-';
-        if (chart) chart.destroy();
-        return;
-      }
-      const leverage = selectedLeverage;
-      const marginDiff = imr - mmr;
-      const priceChange = ((targetPrice - currentPrice) / currentPrice) * 100;
-      const actualPriceChange = direction === "short" ? -priceChange : priceChange;
-      const roiPercent = actualPriceChange * leverage;
-      const pnlValue = (capital * roiPercent) / 100;
-      let liquidationPrice;
-      if (direction === "long") {
-        liquidationPrice = currentPrice * (1 - (marginDiff / 100));
-      } else {
-        liquidationPrice = currentPrice * (1 + (marginDiff / 100));
-      }
-      document.getElementById("marginDiff").innerHTML = `${marginDiff.toFixed(2)}%`;
-      document.getElementById("priceChangeBox").innerHTML = `${actualPriceChange.toFixed(2)}%`;
-      document.getElementById("roiBox").innerHTML = `${roiPercent.toFixed(2)}%`;
-      document.getElementById("pnlBox").innerHTML = `${pnlValue.toFixed(2)} USDT`;
-      document.getElementById("liqBox").innerHTML = `${liquidationPrice.toFixed(4)}`;
-      let ctx = document.getElementById("chart").getContext("2d");
-      if (chart) chart.destroy();
-      chart = new Chart(ctx, {
-        type: "line",
-        data: {
-          labels: ["السعر الحالي", "الهدف", "التصفية"],
-          datasets: [{
-            label: "السعر",
-            data: [currentPrice, targetPrice, liquidationPrice],
-            borderColor: "#58a6ff",
-            backgroundColor: "#58a6ff",
-            tension: 0.3,
-            fill: false
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: { display: false }
-          },
-          scales: {
-            x: { 
-              ticks: { color: "#c9d1d9" },
-              grid: { color: "rgba(201, 209, 217, 0.1)" }
-            },
-            y: { 
-              ticks: { color: "#c9d1d9" },
-              grid: { color: "rgba(201, 209, 217, 0.1)" }
-            }
-          }
-        }
-      });
-    }
-    window.onload = updateUI;
-  </script>
-</body>
-</html>
-"""
+        
+        # Filter options that exceed max leverage
+        valid_leverage_options = {k: v for k, v in leverage_options.items() if v <= max_leverage}
+        
+        st.markdown("**اختر الرافعة المالية**")
+        leverage_cols = st.columns(len(valid_leverage_options))
+        
+        # Create buttons for each leverage option
+        for i, (label, value) in enumerate(valid_leverage_options.items()):
+            if leverage_cols[i].button(label, key=f"lev_btn_{value}", use_container_width=True):
+                st.session_state.selected_leverage = value
+    else:
+        st.warning("الرجاء إدخال قيم صالحة للهامش المبدئي وهامش الحفاظ.")
+        st.session_state.selected_leverage = None
 
+    # Get user inputs
+    col1, col2 = st.columns(2)
+    with col1:
+        capital = st.number_input("المبلغ (USDT)", min_value=0.01, value=10.0, step=0.1)
+    with col2:
+        current_price = st.number_input("السعر الحالي", min_value=0.01, value=25000.0, step=0.01)
+
+    col3, col4 = st.columns(2)
+    with col3:
+        target_price = st.number_input("سعر الهدف", min_value=0.01, value=26000.0, step=0.01)
+    with col4:
+        direction = st.selectbox("الاتجاه", ["📈 شراء (Long)", "📉 بيع (Short)"])
+    
+    # Perform calculations only if all inputs are valid
+    if st.session_state.selected_leverage and capital and current_price and target_price and imr and mmr:
+        leverage = st.session_state.selected_leverage
+        
+        is_long = direction == "📈 شراء (Long)"
+        
+        # Calculation Logic
+        margin_diff = imr - mmr
+        price_change_pct = ((target_price - current_price) / current_price) * 100
+        actual_price_change = price_change_pct if is_long else -price_change_pct
+        roi_percent = actual_price_change * leverage
+        pnl_value = (capital * roi_percent) / 100
+        
+        if is_long:
+            liquidation_price = current_price * (1 - (margin_diff / 100))
+        else:
+            liquidation_price = current_price * (1 + (margin_diff / 100))
+            
+        st.markdown("---")
+        
+        # Display results using st.metric
+        metrics_col1, metrics_col2, metrics_col3 = st.columns(3)
+        with metrics_col1:
+            st.metric(label="فرق الهامش", value=f"{margin_diff:.2f}%")
+        with metrics_col2:
+            st.metric(label="التغير %", value=f"{actual_price_change:.2f}%")
+        with metrics_col3:
+            st.metric(label="ROI %", value=f"{roi_percent:.2f}%")
+            
+        metrics_col4, metrics_col5 = st.columns(2)
+        with metrics_col4:
+            pnl_color = "green" if pnl_value >= 0 else "red"
+            st.markdown(f"**<p style='color: {pnl_color}; font-size: 1.5rem;'>PnL: {pnl_value:.2f} USDT</p>**", unsafe_allow_html=True)
+        with metrics_col5:
+            liq_color = "red"
+            st.markdown(f"**<p style='color: {liq_color}; font-size: 1.5rem;'>سعر التصفية: {liquidation_price:.4f}</p>**", unsafe_allow_html=True)
+            
+        # Display the chart
+        st.markdown("---")
+        st.subheader("📊 مخطط الصفقة")
+        
+        chart_data = pd.DataFrame({
+            "السعر": [current_price, target_price, liquidation_price],
+            "النقطة": ["السعر الحالي", "سعر الهدف", "سعر التصفية"]
+        })
+        chart_data.set_index("النقطة", inplace=True)
+        st.line_chart(chart_data)
+
+# Check if calculator should be displayed
 if st.session_state.show_calculator:
-    # Use a container to hold the popup UI elements
-    with st.container():
-        st.button("❌", on_click=lambda: st.session_state.update(show_calculator=False), key="close_calc_btn")
-        st.components.v1.html(calculator_html, height=700, scrolling=True)
+    st.markdown("---")
+    st.subheader("🧮 حاسبة التداول المتقدمة")
+    trading_calculator_app()
