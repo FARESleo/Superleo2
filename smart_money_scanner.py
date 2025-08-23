@@ -117,11 +117,42 @@ def fetch_trades(instId, limit=400):
 # ----------------------------
 # Metrics
 # ----------------------------
-def compute_cvd(trades_df):
-    if trades_df.empty:
-        return None
-    signed = np.where(trades_df["side"].str.lower()=="buy", trades_df["sz"], -trades_df["sz"])
-    return float(signed.sum())
+def compute_cvd_and_delta(trades_df, ohlcv_df, bar_interval):
+    if trades_df.empty or ohlcv_df.empty:
+        return None, None
+    
+    trades_df["px"] = trades_df["px"].astype(float)
+    trades_df["sz"] = trades_df["sz"].astype(float)
+    trades_df["ts"] = pd.to_datetime(trades_df["ts"].astype(int), unit="ms", utc=True)
+    ohlcv_df["ts"] = pd.to_datetime(ohlcv_df["ts"].astype(int), unit="ms", utc=True)
+    
+    signed_sz = np.where(trades_df["side"].str.lower()=="buy", trades_df["sz"], -trades_df["sz"])
+    trades_df["signed_sz"] = signed_sz
+    
+    trades_df.set_index("ts", inplace=True)
+    delta_per_candle = trades_df["signed_sz"].resample(bar_interval).sum()
+    
+    matched_delta = pd.merge(ohlcv_df, delta_per_candle, how="left", left_on="ts", right_index=True)
+    matched_delta.rename(columns={"signed_sz": "delta"}, inplace=True)
+    matched_delta["delta"] = matched_delta["delta"].fillna(0)
+    
+    cvd = matched_delta["delta"].cumsum()
+    
+    return float(cvd.iloc[-1]), matched_delta["delta"]
+
+def find_liquidity_zones(bids_df, asks_df, price_range_pct=0.01):
+    if bids_df is None or asks_df is None or bids_df.empty or asks_df.empty:
+        return None, None
+    
+    current_price = (bids_df["price"].iloc[0] + asks_df["price"].iloc[0]) / 2
+    
+    bid_zones = bids_df[bids_df["price"] > current_price * (1 - price_range_pct)]
+    ask_zones = asks_df[asks_df["price"] < current_price * (1 + price_range_pct)]
+    
+    top_bids = bid_zones.nlargest(5, "size").to_dict('records')
+    top_asks = ask_zones.nlargest(5, "size").to_dict('records')
+    
+    return top_bids, top_asks
 
 def orderbook_imbalance(bids, asks):
     if bids is None or asks is None or bids.empty or asks.empty:
@@ -168,37 +199,66 @@ def compute_support_resistance(ohlcv_df, window=20):
     resistance = recent["h"].max()
     return support, resistance
 
-def detect_candle_signal(ohlcv_df):
-    if ohlcv_df.empty:
+def detect_candle_signal(ohlcv_df, bar):
+    if ohlcv_df.empty or len(ohlcv_df) < 3:
         return None
+    
     last = ohlcv_df.iloc[-1]
     prev = ohlcv_df.iloc[-2]
-    # bullish engulfing
+    
     if last["c"] > last["o"] and prev["c"] < prev["o"] and last["c"] > prev["o"] and last["o"] < prev["c"]:
         return "Bullish Engulfing"
-    # bearish engulfing
     if last["c"] < last["o"] and prev["c"] > prev["o"] and last["c"] < prev["o"] and last["o"] > prev["c"]:
         return "Bearish Engulfing"
+
+    if bar in ["5m", "15m", "1H"]:
+        prev2 = ohlcv_df.iloc[-3]
+        is_bearish_prev2 = prev2["c"] < prev2["o"]
+        is_small_body_prev = abs(prev["o"] - prev["c"]) < ((last["h"] - last["l"]) * 0.2)
+        is_bullish_last = last["c"] > last["o"]
+        
+        if is_bearish_prev2 and is_small_body_prev and is_bullish_last:
+            return "Bullish Morning Star"
+            
     return None
 
-def compute_confidence(instId, bar="1H"):
-    ohlcv = fetch_ohlcv(instId, bar, limit=300)
-    price = fetch_ticker(instId)
-    funding = fetch_funding(instId)
-    oi = fetch_oi(instId)
-    bids, asks = fetch_orderbook(instId, depth=60)
-    trades = fetch_trades(instId, limit=400)
+def calculate_atr(ohlcv_df, period=14):
+    if ohlcv_df.empty or len(ohlcv_df) < period:
+        return None
+    df = ohlcv_df.copy()
+    high = df['h']
+    low = df['l']
+    close = df['c']
+    
+    df['tr1'] = high - low
+    df['tr2'] = abs(high - close.shift(1))
+    df['tr3'] = abs(low - close.shift(1))
+    df['tr'] = df[['tr1', 'tr2', 'tr3']].max(axis=1)
+    
+    atr = df['tr'].rolling(period).mean().iloc[-1]
+    return atr
 
-    cvd = compute_cvd(trades) if not trades.empty else None
+
+def compute_confidence(instId, bar="1H"):
+    with st.spinner("Computing — gathering live data..."):
+        ohlcv = fetch_ohlcv(instId, bar, limit=300)
+        price = fetch_ticker(instId)
+        funding = fetch_funding(instId)
+        oi = fetch_oi(instId)
+        bids, asks = fetch_orderbook(instId, depth=60)
+        trades = fetch_trades(instId, limit=400)
+    
+    cvd_total, delta_series = compute_cvd_and_delta(trades, ohlcv, bar)
     ob_imb = orderbook_imbalance(bids, asks)
+    top_bids, top_asks = find_liquidity_zones(bids, asks)
     bt_win = simple_backtest_winrate(ohlcv, lookahead=6, stop_pct=0.01, rr=2.0)
     support, resistance = compute_support_resistance(ohlcv)
-    candle_signal = detect_candle_signal(ohlcv)
+    candle_signal = detect_candle_signal(ohlcv, bar)
 
     # Normalize metrics 0..1
     fund_score = 0.5 + np.tanh(funding*500)/2 if funding is not None else 0.5
     oi_score = 0.5 + (np.tanh(np.log1p(oi)/20.0))/2 if oi is not None else 0.5
-    cvd_score = 0.5 + np.tanh(cvd/1e4)/2 if cvd is not None else 0.5
+    cvd_score = 0.5 + np.tanh(cvd_total/1e4)/2 if cvd_total is not None else 0.5
     ob_score = (ob_imb +1)/2 if ob_imb is not None else 0.5
     bt_score = bt_win if bt_win is not None else 0.5
 
@@ -206,35 +266,62 @@ def compute_confidence(instId, bar="1H"):
     weights = {"backtest":0.3, "orderbook":0.25, "cvd":0.2, "oi":0.15, "funding":0.1}
     conf = sum(metrics[k]*weights[k] for k in metrics)
     confidence_pct = round(max(0, min(conf*100,100)),1)
-
-    # Trade suggestion
-    if confidence_pct >= 65:
-        label = "📈 Bullish"
-        recommendation = "LONG (buy)"
-        entry = price
-        target = round(resistance if resistance else price*1.01,6)
-        stop = round(support if support else price*0.99,6)
-    elif confidence_pct <= 35:
-        label = "📉 Bearish"
-        recommendation = "SHORT (sell)"
-        entry = price
-        target = round(support if support else price*0.99,6)
-        stop = round(resistance if resistance else price*1.01,6)
-    else:
+    
+    atr = calculate_atr(ohlcv, period=14)
+    if atr is None or price is None:
         label = "⚠️ Neutral / Mixed"
         recommendation = "Wait"
         entry = price
         target = stop = None
+        reason = "بيانات غير كافية لحساب ATR."
+    
+    else:
+        is_bullish_signal = (
+            (confidence_pct >= 60) and
+            (cvd_total > 0) and
+            (ob_imb > 0) and
+            (candle_signal in ["Bullish Engulfing", "Bullish Morning Star"])
+        )
+        
+        is_bearish_signal = (
+            (confidence_pct <= 40) and
+            (cvd_total < 0) and
+            (ob_imb < 0) and
+            (candle_signal == "Bearish Engulfing")
+        )
+        
+        if is_bullish_signal:
+            label = "📈 Bullish"
+            recommendation = "LONG (buy)"
+            entry = price
+            target = round(entry + (atr * 2), 6)
+            stop = round(entry - atr, 6)
+            reason = f"إشارة صعودية قوية: {candle_signal} + CVD إيجابي + سجل طلبات صاعد."
 
-    raw = {"price":price,"funding":funding,"oi":oi,"cvd":cvd,"orderbook_imbalance":ob_imb,"backtest_win":bt_win,"support":support,"resistance":resistance,"candle_signal":candle_signal}
+        elif is_bearish_signal:
+            label = "📉 Bearish"
+            recommendation = "SHORT (sell)"
+            entry = price
+            target = round(entry - (atr * 2), 6)
+            stop = round(entry + atr, 6)
+            reason = f"إشارة هبوطية قوية: {candle_signal} + CVD سلبي + سجل طلبات هابط."
+            
+        else:
+            label = "⚠️ Neutral / Mixed"
+            recommendation = "Wait"
+            entry = price
+            target = stop = None
+            reason = "المؤشرات مختلطة، أو لا يوجد سبب مقنع للدخول في صفقة حاليًا."
 
-    return {"label":label,"confidence_pct":confidence_pct,"recommendation":recommendation,"entry":entry,"target":target,"stop":stop,"metrics":metrics,"weights":weights,"raw":raw}
+    raw = {"price":price,"funding":funding,"oi":oi,"cvd":cvd_total,"orderbook_imbalance":ob_imb,"backtest_win":bt_win,"support":support,"resistance":resistance,"candle_signal":candle_signal, "top_bids":top_bids, "top_asks":top_asks, "atr":atr}
+
+    return {"label":label,"confidence_pct":confidence_pct,"recommendation":recommendation,"entry":entry,"target":target,"stop":stop,"metrics":metrics,"weights":weights,"raw":raw,"reason":reason}
 
 # ----------------------------
 # Streamlit UI
 # ----------------------------
-st.set_page_config(page_title="Smart Money Scanner V3.8", layout="wide")
-st.title("🧠 Smart Money Scanner V3.8 — Flexible Signals & Trade Suggestion")
+st.set_page_config(page_title="Smart Money Scanner V4.0", layout="wide")
+st.title("🧠 Smart Money Scanner V4.0 — Flexible Signals & Trade Suggestion")
 
 inst_type = st.sidebar.selectbox("Instrument Type", ["SWAP","SPOT"])
 instruments = fetch_instruments(inst_type)
@@ -242,18 +329,16 @@ if not instruments:
     st.sidebar.error("Unable to load instruments from OKX.")
     st.stop()
 instId = st.sidebar.selectbox("Instrument", instruments, index=0)
-bar = st.sidebar.selectbox("Timeframe", ["1m","5m","15m","1H","4H","1D"], index=3)
+bar = st.sidebar.selectbox("Timeframe", ["5m","15m","1H","6H","12H"], index=2)
 show_raw = st.sidebar.checkbox("Show Raw metrics", value=False)
 
 if st.sidebar.button("Compute Confidence"):
-    with st.spinner("Computing — gathering live data..."):
-        result = compute_confidence(instId, bar)
+    result = compute_confidence(instId, bar)
 
     st.subheader(f"{result['label']} — Confidence: {result['confidence_pct']}%")
     st.markdown(f"### Recommendation: {result['recommendation']}")
     st.metric("Live Price", f"{result['raw']['price']:,}" if result['raw']['price'] else "N/A")
 
-    # Metrics with icons
     icons = {"funding":"💰","oi":"📊","cvd":"📈","orderbook":"⚖️","backtest":"🧪"}
     cols = st.columns(5)
     for idx, k in enumerate(["funding","oi","cvd","orderbook","backtest"]):
@@ -264,16 +349,19 @@ if st.sidebar.button("Compute Confidence"):
         col.metric(label=f"{icons[k]} {k.upper()}", value=f"{score:.3f}", delta=f"w={weight}")
         col.caption(f"Contribution: {contrib}%")
 
+    st.markdown("---")
     st.markdown("🔎 **Support / Resistance & Candle Signals**")
     st.markdown(f"• Support (approx): {result['raw']['support']}")
     st.markdown(f"• Resistance (approx): {result['raw']['resistance']}")
     st.markdown(f"• Candle Signal: {result['raw']['candle_signal'] if result['raw']['candle_signal'] else 'None'}")
-
+    
+    st.markdown("---")
     st.markdown("📝 **Trade Suggestion**")
+    st.markdown(f"• Recommendation: {result['recommendation']}")
+    st.markdown(f"• Reason: **{result['reason']}**")
     st.markdown(f"• Entry: {result['entry']}")
     st.markdown(f"• Target: {result['target'] if result['target'] else 'N/A'}")
     st.markdown(f"• Stop: {result['stop'] if result['stop'] else 'N/A'}")
-    st.markdown(f"• Reason: Metrics + Orderbook + Support/Resistance + Candle Signal")
 
     if show_raw:
         st.markdown("### Raw metrics (for transparency)")
