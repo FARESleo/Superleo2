@@ -9,7 +9,7 @@ from datetime import datetime
 OKX_BASE = "https://www.okx.com"
 
 # ----------------------------
-# CSS Styling for a modern and readable look
+# CSS Styling for a high-contrast, modern look
 # ----------------------------
 st.markdown("""
 <style>
@@ -19,8 +19,8 @@ st.markdown("""
     padding-bottom: 5rem;
     padding-left: 1rem;
     padding-right: 1rem;
-    background-color: #121212; /* Darker, more technical background */
-    color: #FFFFFF; /* White text for maximum contrast */
+    background-color: #0D0D0D; /* A very dark grey background */
+    color: #FFFFFF; /* Pure white text for maximum contrast */
 }
 
 /* Hide Streamlit's default hamburger menu */
@@ -34,7 +34,7 @@ st.markdown("""
 
 /* Card-like containers for sections */
 .stCard {
-    background-color: #1a1a1a;
+    background-color: #1a1a1a; /* Slightly lighter than the background */
     border-radius: 10px;
     padding: 20px;
     margin-bottom: 20px;
@@ -53,7 +53,7 @@ st.markdown("""
 }
 .stMetric:hover {
     transform: translateY(-3px);
-    border: 1px solid #00FFFF; /* Glow effect on hover */
+    border: 1px solid #00BFFF; /* Electric blue hover effect */
 }
 .stMetric .st-bd .st-b5 {
     color: #FFFFFF !important; /* Make metric value white for visibility */
@@ -66,36 +66,33 @@ st.markdown("""
 
 /* Color coding for metrics */
 .stMetric.bullish {
-    border-left: 5px solid #7CFC00; /* Neon green border */
+    border-left: 5px solid #32CD32; /* Lime green border */
 }
 .stMetric.bearish {
-    border-left: 5px solid #FF69B4; /* Neon pink/red border */
+    border-left: 5px solid #FF00FF; /* Bold magenta border */
 }
 .stMetric.neutral {
-    border-left: 5px solid #00FFFF; /* Cyan border for neutrality */
+    border-left: 5px solid #00BFFF; /* Electric blue border for neutrality */
 }
 
-/* Font and text color - Made bright white for max readability */
-html, body {
+/* Font and text color */
+html, body, .st-emotion-cache-12oz5g7, .st-emotion-cache-1r651o3 {
     color: #FFFFFF !important;
     font-family: 'Segoe UI', 'Roboto', sans-serif;
-}
-.st-emotion-cache-12oz5g7, .st-emotion-cache-1r651o3 {
-    color: #FFFFFF !important;
 }
 
 /* Headings */
 h1, h2, h3, h4, h5, h6 {
-    color: #FFFFFF;
-    border-bottom: 2px solid #00FFFF; /* Underline headings with a techy color */
+    color: #00BFFF; /* Electric blue for headings */
+    border-bottom: 2px solid #00BFFF;
     padding-bottom: 5px;
     margin-bottom: 15px;
 }
 
 /* Buttons */
 .stButton>button {
-    background-color: #0d6efd;
-    color: white;
+    background-color: #00BFFF; /* Electric blue button */
+    color: #0D0D0D; /* Dark text on button */
     font-weight: bold;
     border-radius: 8px;
     border: none;
@@ -103,7 +100,7 @@ h1, h2, h3, h4, h5, h6 {
     transition: background-color 0.2s ease-in-out;
 }
 .stButton>button:hover {
-    background-color: #0a58ca;
+    background-color: #0080FF;
 }
 
 /* Special styles for main headers */
