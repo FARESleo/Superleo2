@@ -495,6 +495,21 @@ def format_price(price, decimals=None):
         else: decimals = 4
     return f"{price:,.{decimals}f}"
 
+# New function to calculate PnL percentages
+def calculate_pnl_percentages(entry_price, take_profit, stop_loss):
+    if entry_price is None or take_profit is None or stop_loss is None or entry_price == 0:
+        return None, None
+    
+    profit_pct = ((take_profit - entry_price) / entry_price) * 100
+    loss_pct = ((stop_loss - entry_price) / entry_price) * 100
+    
+    # Correct for long vs short
+    is_long = take_profit > entry_price
+    if not is_long:
+        profit_pct, loss_pct = loss_pct, profit_pct
+    
+    return profit_pct, loss_pct
+
 # Initialize session state
 if 'analysis_results' not in st.session_state:
     st.session_state.analysis_results = None
@@ -635,6 +650,13 @@ if st.session_state.analysis_results:
         """, unsafe_allow_html=True)
         
     with trade_plan_col2:
+        # Calculate PnL percentages
+        profit_pct, loss_pct = calculate_pnl_percentages(
+            result['entry'], 
+            result['target'], 
+            result['stop']
+        )
+        
         st.markdown(f"""
             <div class="trade-plan-metric">
                 <div class="trade-plan-metric-label">🔍 سعر الدخول:</div>
@@ -642,11 +664,11 @@ if st.session_state.analysis_results:
             </div>
             <div class="trade-plan-metric">
                 <div class="trade-plan-metric-label">🎯 السعر المستهدف:</div>
-                <div class="trade-plan-metric-value">{format_price(result['target'])}</div>
+                <div class="trade-plan-metric-value">{format_price(result['target'])} <span style='font-size: 14px; color: green;'>({profit_pct:.2f}%)</span></div>
             </div>
             <div class="trade-plan-metric">
                 <div class="trade-plan-metric-label">🛑 وقف الخسارة:</div>
-                <div class="trade-plan-metric-value">{format_price(result['stop'])}</div>
+                <div class="trade-plan-metric-value">{format_price(result['stop'])} <span style='font-size: 14px; color: red;'>({loss_pct:.2f}%)</span></div>
             </div>
         """, unsafe_allow_html=True)
         
