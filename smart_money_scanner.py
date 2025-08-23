@@ -338,22 +338,41 @@ def compute_confidence(instId, bar="1H"):
 # ----------------------------
 # Streamlit UI
 # ----------------------------
-st.set_page_config(page_title="Smart Money Scanner V4.3", layout="wide")
-st.title("🧠 Smart Money Scanner V4.3 — Dynamic Signals & Tiered Recommendations")
+st.set_page_config(page_title="Smart Money Scanner V4.4", layout="wide")
+st.title("🧠 Smart Money Scanner V4.4 — Dynamic Signals & Tiered Recommendations")
 
 st.sidebar.markdown("### ⚙️ Scanner Settings")
 inst_type = st.sidebar.selectbox("Instrument Type", ["SWAP","SPOT"])
-instruments = fetch_instruments(inst_type)
 
-if not instruments:
+if 'instId' not in st.session_state:
+    st.session_state.instId = ""
+    
+# fetch instruments once and group them
+all_instruments = fetch_instruments(inst_type)
+if not all_instruments:
     st.sidebar.error("Unable to load instruments from OKX.")
     st.stop()
 
-# Use a search box instead of a selectbox for instruments
-instId = st.sidebar.text_input("Search for Instrument", value=instruments[0])
-if instId not in instruments:
-    st.sidebar.warning(f"Instrument '{instId}' not found. Please choose a valid one.")
-    
+# Group instruments by base currency
+groups = {}
+for inst in all_instruments:
+    base = inst.split('-')[0]
+    if base not in groups:
+        groups[base] = []
+    groups[base].append(inst)
+
+st.sidebar.markdown("### 🔍 Select Instrument")
+selected_inst = ""
+for base_currency in sorted(groups.keys()):
+    with st.sidebar.expander(f"**{base_currency} Pairs**"):
+        options = groups[base_currency]
+        # Use a single-select radio button for clarity
+        radio_key = f"radio_{base_currency}"
+        selected = st.radio("Choose a pair:", options=options, key=radio_key)
+        if selected:
+            st.session_state.instId = selected
+            selected_inst = selected
+
 bar = st.sidebar.selectbox("Timeframe", ["5m","15m","1H","6H","12H"], index=2)
 show_raw = st.sidebar.checkbox("Show Raw metrics", value=False)
 st.sidebar.markdown("---")
@@ -367,7 +386,8 @@ def run_analysis_clicked():
 
 st.sidebar.button("Run Analysis", on_click=run_analysis_clicked)
 
-if st.session_state.run_analysis:
+if st.session_state.run_analysis and st.session_state.instId:
+    instId = st.session_state.instId
     result = compute_confidence(instId, bar)
 
     st.markdown(f"**_Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_**")
@@ -389,7 +409,7 @@ if st.session_state.run_analysis:
 
     # Display core metrics with icons
     st.markdown("### 📊 Core Metrics")
-    icons = {"funding":"💰","oi":"📊","cvd":"📈","orderbook":"⚖️","backtest":"🧪"}
+    icons = {"funding":"💰","oi":"📊","📈":"📈","orderbook":"⚖️","backtest":"🧪"}
     cols = st.columns(5)
     for idx, k in enumerate(["funding","oi","cvd","orderbook","backtest"]):
         col = cols[idx]
