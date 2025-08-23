@@ -945,6 +945,9 @@ def live_market_tracker():
         filtered_df = filtered_df[filtered_df['name'].str.lower().str.contains(search_query) | 
                                  filtered_df['symbol'].str.lower().str.contains(search_query)]
     
+    # Combine name and symbol into one column
+    filtered_df['اسم العملة'] = filtered_df['name'] + ' (' + filtered_df['symbol'].str.upper() + ')'
+    
     # Sort by price change
     filtered_df = filtered_df.sort_values(by='price_change_abs', ascending=False)
     
@@ -953,15 +956,13 @@ def live_market_tracker():
     else:
         # Prepare data for display
         display_df = filtered_df[[
-            'name',
-            'symbol',
+            'اسم العملة',
             'current_price',
             'price_change_percentage_24h',
             'high_24h',
             'low_24h'
         ]].rename(columns={
-            'name': 'الاسم',
-            'symbol': 'الرمز',
+            'اسم العملة': 'الاسم',
             'current_price': 'السعر ($)',
             'price_change_percentage_24h': 'التغيير (24س) %',
             'high_24h': 'أعلى سعر (24س) ($)',
