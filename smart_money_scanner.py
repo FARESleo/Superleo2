@@ -6,7 +6,7 @@ import time
 from math import isnan
 from datetime import datetime
 
-# --- كود إضافة صورة الخلفية ---
+# --- كود CSS لتصميم الواجهة ---
 st.markdown(
     """
     <style>
@@ -103,15 +103,6 @@ st.markdown(
     }
 
     /* --- كود CSS الجديد لتثبيت الشريط العلوي وتصميم الأزرار --- */
-    .fixed-header-container {
-        position: sticky;
-        top: 0;
-        z-index: 1000; /* يضمن بقاءه فوق العناصر الأخرى */
-        background: rgba(255, 255, 255, 0.9); /* خلفية شبه شفافة */
-        padding: 10px 0;
-        border-bottom: 1px solid #eee;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
     .st-emotion-cache-1r6y4y1 {
         background-color: transparent !important;
     }
@@ -138,17 +129,34 @@ st.markdown(
     div.stButton > button#tracker_button {
         background-image: linear-gradient(to right, #11c062, #07712d);
     }
+    
+    /* تثبيت الشريط العلوي */
+    .fixed-header-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 10px 20px;
+        border-bottom: 1px solid #eee;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        display: flex;
+        align-items: center;
+        gap: 15px; /* مسافة بين العناصر */
+    }
+    .st-emotion-cache-1r6y4y1 > div {
+        flex-grow: 1; /* لجعل العناصر تتوزع بالتساوي */
+    }
     </style>
     """,
     unsafe_allow_html=True
 )
 
-
+# --- الكود الأصلي للدوال والمكونات (بدون تغيير) ---
 OKX_BASE = "https://www.okx.com"
 
-# ----------------------------
 # HTTP helper with retries
-# ----------------------------
 @st.cache_data(ttl=600)
 def okx_get(path, params=None, retries=3, delay=0.6):
     url = f"{OKX_BASE}{path}"
@@ -162,9 +170,7 @@ def okx_get(path, params=None, retries=3, delay=0.6):
         time.sleep(delay * (i + 1))
     return None
 
-# ----------------------------
 # Data fetchers (cached)
-# ----------------------------
 @st.cache_data(ttl=600)
 def fetch_instruments(inst_type="SWAP"):
     j = okx_get("/api/v5/public/instruments", {"instType": inst_type})
@@ -510,42 +516,45 @@ if not all_instruments:
     st.stop()
     
 # --- شريط علوي ثابت مع الأزرار ---
-with st.container():
-    st.markdown('<div class="fixed-header-container">', unsafe_allow_html=True)
-    header_col1, header_col2, header_col3, header_col4 = st.columns([0.5, 0.2, 0.15, 0.15])
-    
-    with header_col1:
-        st.header("🧠 Smart Money Scanner")
+st.markdown('<div class="fixed-header-container">', unsafe_allow_html=True)
 
-    def run_analysis_clicked():
-        st.session_state.analysis_results = compute_confidence(st.session_state.selected_instId, st.session_state.bar)
+# إضافة عنوان التطبيق
+st.markdown("<h2 style='font-size: 20px; font-weight: bold; margin: 0; padding: 0;'>🧠 Smart Money Scanner</h2>", unsafe_allow_html=True)
 
-    with header_col2:
-        if st.button("Go"):
-            run_analysis_clicked()
-            
-    def toggle_calculator():
-        st.session_state.show_calculator = not st.session_state.show_calculator
-        st.session_state.selected_leverage = None # Reset leverage when opening/closing
+header_col1, header_col2, header_col3 = st.columns(3)
 
-    with header_col3:
-        st.button("Calculator", on_click=toggle_calculator, key="calc_button")
+def run_analysis_clicked():
+    st.session_state.analysis_results = compute_confidence(st.session_state.selected_instId, st.session_state.bar)
 
-    def toggle_tracker():
-        st.session_state.show_tracker = not st.session_state.show_tracker
+with header_col1:
+    if st.button("🚀 Go"):
+        run_analysis_clicked()
+        
+def toggle_calculator():
+    st.session_state.show_calculator = not st.session_state.show_calculator
+    st.session_state.selected_leverage = None
 
-    with header_col4:
-        st.button("Tracker", on_click=toggle_tracker, key="tracker_button")
+with header_col2:
+    st.button("🧮 Calculator", on_click=toggle_calculator, key="calc_button")
 
-    st.markdown('</div>', unsafe_allow_html=True)
+def toggle_tracker():
+    st.session_state.show_tracker = not st.session_state.show_tracker
+
+with header_col3:
+    st.button("📊 Tracker", on_click=toggle_tracker, key="tracker_button")
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+# إضافة مساحة فارغة لضمان عدم تداخل المحتوى مع الشريط الثابت
+st.markdown("<div style='height: 80px;'></div>", unsafe_allow_html=True)
 
 
 # Display last updated time and user inputs
-st.markdown(f"**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+st.markdown(f"**آخر تحديث:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 st.markdown("---")
 
-st.session_state.selected_instId = st.selectbox("Select Instrument", all_instruments, index=all_instruments.index(st.session_state.selected_instId) if st.session_state.selected_instId in all_instruments else 0)
-st.session_state.bar = st.selectbox("Timeframe", ["30m", "15m", "1H", "6H", "12H"], index=["30m", "15m", "1H", "6H", "12H"].index(st.session_state.bar) if st.session_state.bar in ["30m", "15m", "1H", "6H", "12H"] else 0)
+st.session_state.selected_instId = st.selectbox("حدد الأداة", all_instruments, index=all_instruments.index(st.session_state.selected_instId) if st.session_state.selected_instId in all_instruments else 0)
+st.session_state.bar = st.selectbox("الإطار الزمني", ["30m", "15m", "1H", "6H", "12H"], index=["30m", "15m", "1H", "6H", "12H"].index(st.session_state.bar) if st.session_state.bar in ["30m", "15m", "1H", "6H", "12H"] else 0)
 
 
 # Display results if available
