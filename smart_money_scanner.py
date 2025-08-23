@@ -11,6 +11,7 @@ OKX_BASE = "https://www.okx.com"
 # ----------------------------
 # HTTP helper with retries
 # ----------------------------
+@st.cache_data(ttl=600)
 def okx_get(path, params=None, retries=3, delay=0.6):
     url = f"{OKX_BASE}{path}"
     for i in range(retries):
@@ -338,61 +339,50 @@ def compute_confidence(instId, bar="1H"):
 # ----------------------------
 # Streamlit UI
 # ----------------------------
-st.set_page_config(page_title="Smart Money Scanner V4.5", layout="wide")
-st.title("🧠 Smart Money Scanner V4.5 — Bug Fix")
+st.set_page_config(page_title="Smart Money Scanner V4.6", layout="wide")
+st.title("🧠 Smart Money Scanner V4.6 — Redesigned UI")
 
-st.sidebar.markdown("### ⚙️ Scanner Settings")
-inst_type = st.sidebar.selectbox("Instrument Type", ["SWAP","SPOT"])
-
-if 'instId' not in st.session_state:
-    st.session_state.instId = ""
-    
-# fetch instruments once and group them
-all_instruments = fetch_instruments(inst_type)
-if not all_instruments:
-    st.sidebar.error("Unable to load instruments from OKX.")
-    st.stop()
-
-# Group instruments by base currency
-groups = {}
-for inst in all_instruments:
-    base = inst.split('-')[0]
-    if base not in groups:
-        groups[base] = []
-    groups[base].append(inst)
-
-st.sidebar.markdown("### 🔍 Select Instrument")
-selected_inst = ""
-for base_currency in sorted(groups.keys()):
-    with st.sidebar.expander(f"**{base_currency} Pairs**"):
-        options = groups[base_currency]
-        # Use a single-select radio button for clarity
-        radio_key = f"radio_{base_currency}"
-        selected = st.radio("Choose a pair:", options=options, key=radio_key)
-        if selected:
-            st.session_state.instId = selected
-            selected_inst = selected
-
-bar = st.sidebar.selectbox("Timeframe", ["5m","15m","1H","6H","12H"], index=2)
-show_raw = st.sidebar.checkbox("Show Raw metrics", value=False)
-st.sidebar.markdown("---")
-
-# Use a button to trigger the analysis
+# Initialize session state for analysis results and selected instrument
+if 'analysis_results' not in st.session_state:
+    st.session_state.analysis_results = None
+if 'selected_instId' not in st.session_state:
+    st.session_state.selected_instId = ""
 if 'run_analysis' not in st.session_state:
     st.session_state.run_analysis = False
 
+# Fetch all instruments once
+all_instruments = fetch_instruments("SWAP") + fetch_instruments("SPOT")
+if not all_instruments:
+    st.error("Unable to load instruments from OKX.")
+    st.stop()
+
+# Header for UI elements
+st.markdown("### ⚙️ Scanner Controls")
+
+# Create two columns for controls
+col1, col2 = st.columns(2)
+
+with col1:
+    st.session_state.selected_instId = st.selectbox("Select Instrument", all_instruments, index=all_instruments.index("BTC-USDT-SWAP") if "BTC-USDT-SWAP" in all_instruments else 0)
+
+with col2:
+    bar = st.selectbox("Timeframe", ["5m","15m","1H","6H","12H"], index=2)
+
+st.sidebar.markdown("### 🚀 Actions")
+
 def run_analysis_clicked():
     st.session_state.run_analysis = True
+    st.session_state.analysis_results = compute_confidence(st.session_state.selected_instId, bar)
+    st.cache_data.clear() # Clear cache to fetch new data
 
 st.sidebar.button("Run Analysis", on_click=run_analysis_clicked)
 
-if st.session_state.run_analysis and st.session_state.instId:
-    instId = st.session_state.instId
-    result = compute_confidence(instId, bar)
-
+# Display results if available
+if st.session_state.analysis_results:
+    result = st.session_state.analysis_results
+    
     st.markdown(f"**_Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_**")
     
-    # Display the primary recommendation in a clean metric block
     st.markdown("---")
     main_col1, main_col2, main_col3 = st.columns(3)
     
@@ -407,9 +397,7 @@ if st.session_state.run_analysis and st.session_state.instId:
 
     st.markdown("---")
 
-    # Display core metrics with icons
     st.markdown("### 📊 Core Metrics")
-    # Corrected the icons dictionary keys
     icons = {"funding":"💰","oi":"📊","cvd":"📈","orderbook":"⚖️","backtest":"🧪"}
     cols = st.columns(5)
     for idx, k in enumerate(["funding","oi","cvd","orderbook","backtest"]):
@@ -433,9 +421,10 @@ if st.session_state.run_analysis and st.session_state.instId:
     st.markdown(f"• **Support:** {result['raw']['support']:,} | **Resistance:** {result['raw']['resistance']:,}")
     st.markdown(f"• **Candle Signal:** {result['raw']['candle_signal'] if result['raw']['candle_signal'] else 'None'}")
     
+    show_raw = st.sidebar.checkbox("Show Raw metrics", value=False)
     if show_raw:
         st.markdown("### Raw metrics (for transparency)")
         st.json(result["raw"])
 
 else:
-    st.info("Select instrument/timeframe and press 'Run Analysis' in the sidebar to begin.")
+    st.info("Select instrument/timeframe from the top and press 'Run Analysis' in the sidebar to begin.")
