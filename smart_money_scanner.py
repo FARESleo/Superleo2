@@ -103,13 +103,32 @@ st.markdown(
     }
 
     /* --- كود CSS الجديد لتثبيت الشريط العلوي وتصميم الأزرار --- */
-    .st-emotion-cache-1r6y4y1 {
-        background-color: transparent !important;
+    /* Target the main app container for the fixed header */
+    .stApp > header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 999;
+        padding: 15px;
+        background-color: white; /* Add a background color to make it visible */
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
     }
+    
+    /* Center the main content to avoid it being hidden under the fixed header */
+    .stApp > div:first-child > div:nth-child(2) {
+        padding-top: 100px; /* Adjust this value to match header height */
+    }
+    
+    /* Make buttons and columns work together */
     div.stButton > button {
         background-image: linear-gradient(to right, #6A11CB, #2575FC);
         color: white;
-        padding: 12px 30px;
+        padding: 12px 20px;
         font-size: 16px;
         font-weight: bold;
         border-radius: 8px;
@@ -130,23 +149,9 @@ st.markdown(
         background-image: linear-gradient(to right, #11c062, #07712d);
     }
     
-    /* تثبيت الشريط العلوي */
-    .fixed-header-container {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        z-index: 1000;
-        background: rgba(255, 255, 255, 0.9);
-        padding: 10px 20px;
-        border-bottom: 1px solid #eee;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        display: flex;
-        align-items: center;
-        gap: 15px; /* مسافة بين العناصر */
-    }
-    .st-emotion-cache-1r6y4y1 > div {
-        flex-grow: 1; /* لجعل العناصر تتوزع بالتساوي */
+    /* Adjust columns spacing for a better side-by-side layout */
+    .st-emotion-cache-1r6y4y1 {
+        gap: 15px !important;
     }
     </style>
     """,
@@ -516,11 +521,7 @@ if not all_instruments:
     st.stop()
     
 # --- شريط علوي ثابت مع الأزرار ---
-st.markdown('<div class="fixed-header-container">', unsafe_allow_html=True)
-
-# إضافة عنوان التطبيق
-st.markdown("<h2 style='font-size: 20px; font-weight: bold; margin: 0; padding: 0;'>🧠 Smart Money Scanner</h2>", unsafe_allow_html=True)
-
+st.markdown("<h1 style='font-size: 2.5rem; font-weight: bold; margin: 0; padding: 0;'>🧠 Smart Money Scanner</h1>", unsafe_allow_html=True)
 header_col1, header_col2, header_col3 = st.columns(3)
 
 def run_analysis_clicked():
@@ -542,11 +543,6 @@ def toggle_tracker():
 
 with header_col3:
     st.button("📊 Tracker", on_click=toggle_tracker, key="tracker_button")
-
-st.markdown('</div>', unsafe_allow_html=True)
-
-# إضافة مساحة فارغة لضمان عدم تداخل المحتوى مع الشريط الثابت
-st.markdown("<div style='height: 80px;'></div>", unsafe_allow_html=True)
 
 
 # Display last updated time and user inputs
@@ -887,5 +883,3 @@ def live_market_tracker():
 # Check which tool to display based on session state
 if st.session_state.show_calculator:
     trading_calculator_app()
-elif st.session_state.show_tracker:
-    live_market_tracker()
