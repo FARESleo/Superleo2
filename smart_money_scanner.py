@@ -780,7 +780,6 @@ def trading_calculator_app():
     imr = st.number_input("الهامش المبدئي (IMR %)", min_value=0.01, value=2.0, step=0.1, help="النسبة المئوية من إجمالي قيمة الصفقة التي تودعها.")
     mmr = st.number_input("هامش الحِفاظ (MMR %)", min_value=0.01, value=1.0, step=0.1, help="الحد الأدنى من الهامش المطلوب للحفاظ على الصفقة.")
     
-    # Logic to determine max leverage
     if imr > mmr and imr > 0:
         margin_diff = imr - mmr
         max_leverage = round(100 / margin_diff, 2)
@@ -794,13 +793,11 @@ def trading_calculator_app():
             f"{max_leverage}x (القصوى)": max_leverage
         }
         
-        # Filter options that exceed max leverage
         valid_leverage_options = {k: v for k, v in leverage_options.items() if v <= max_leverage}
         
         st.markdown("**اختر الرافعة المالية**")
         leverage_cols = st.columns(len(valid_leverage_options))
         
-        # Create buttons for each leverage option
         for i, (label, value) in enumerate(valid_leverage_options.items()):
             if leverage_cols[i].button(label, key=f"lev_btn_{value}", use_container_width=True):
                 st.session_state.selected_leverage = value
@@ -808,7 +805,6 @@ def trading_calculator_app():
         st.warning("الرجاء إدخال قيم صالحة للهامش المبدئي وهامش الحفاظ.")
         st.session_state.selected_leverage = None
 
-    # Get user inputs
     col1, col2 = st.columns(2)
     with col1:
         capital = st.number_input("المبلغ (USDT)", min_value=0.01, value=10.0, step=0.1)
@@ -821,13 +817,10 @@ def trading_calculator_app():
     with col4:
         direction = st.selectbox("الاتجاه", ["📈 شراء (Long)", "📉 بيع (Short)"])
     
-    # Perform calculations only if all inputs are valid
     if st.session_state.selected_leverage and capital and current_price and target_price and imr and mmr:
         leverage = st.session_state.selected_leverage
-        
         is_long = direction == "📈 شراء (Long)"
         
-        # Calculation Logic
         margin_diff = imr - mmr
         price_change_pct = ((target_price - current_price) / current_price) * 100
         actual_price_change = price_change_pct if is_long else -price_change_pct
@@ -841,7 +834,6 @@ def trading_calculator_app():
             
         st.markdown("---")
         
-        # Display results using st.metric
         metrics_col1, metrics_col2, metrics_col3 = st.columns(3)
         with metrics_col1:
             st.metric(label="فرق الهامش", value=f"{margin_diff:.2f}%")
@@ -857,17 +849,6 @@ def trading_calculator_app():
         with metrics_col5:
             liq_color = "red"
             st.markdown(f"**<p style='color: {liq_color}; font-size: 1.5rem;'>سعر التصفية: {liquidation_price:.4f}</p>**", unsafe_allow_html=True)
-            
-        # Display the chart
-        st.markdown("---")
-        st.subheader("📊 مخطط الصفقة")
-        
-        chart_data = pd.DataFrame({
-            "السعر": [current_price, target_price, liquidation_price],
-            "النقطة": ["السعر الحالي", "سعر الهدف", "سعر التصفية"]
-        })
-        chart_data.set_index("النقطة", inplace=True)
-        st.line_chart(chart_data)
 
 # Check if calculator should be displayed
 if st.session_state.show_calculator:
