@@ -501,6 +501,7 @@ with header_col2:
         
 def toggle_calculator():
     st.session_state.show_calculator = not st.session_state.show_calculator
+    st.experimental_rerun()
 
 with header_col3:
     st.markdown("""
@@ -953,6 +954,7 @@ calculator_html = """
         display: flex;
         align-items: center;
         justify-content: center;
+        z-index: 10001;
     }
     /* Mobile Responsiveness */
     @media (max-width: 600px) {
@@ -970,18 +972,6 @@ calculator_html = """
         }
         .results {
             grid-template-columns: 1fr;
-        }
-        .st-html-container {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100% !important;
-            height: 100% !important;
-            z-index: 10000;
-            overflow-y: auto;
-            background: var(--bg-color); /* Match background for smooth transition */
-            padding: 0;
-            border-radius: 0;
         }
     }
   </style>
@@ -1158,28 +1148,9 @@ calculator_html = """
 </html>
 """
 
-# The HTML component to be rendered as a floating popup
-floating_calculator_html = f"""
-<div style="
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 9999;
-    background: #161b22;
-    border-radius: 20px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    width: 500px;
-    max-width: 90%;
-    padding: 30px;
-    overflow-y: auto;
-    max-height: 90vh;
-">
-    <button onclick="parent.Streamlit.setComponentValue('hide_calculator')" class="close-btn">×</button>
-    {calculator_html}
-</div>
-"""
-
 if st.session_state.show_calculator:
-    # Use st.components.v1.html for more control and to handle JavaScript
-    st.components.v1.html(floating_calculator_html, height=700, scrolling=True)
+    # Use a container to hold the popup UI elements
+    with st.container():
+        # This button is now responsible for closing the popup
+        st.button("❌", on_click=lambda: st.session_state.update(show_calculator=False), key="close_calc_btn")
+        st.components.v1.html(calculator_html, height=700, scrolling=True)
