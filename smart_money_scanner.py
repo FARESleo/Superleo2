@@ -399,32 +399,32 @@ def compute_confidence(instId, bar="1H"):
             recommendation = "LONG"
             strength = "Strong"
             entry = price
-            target = round(entry + (atr * 2), 6)
-            stop = round(entry - atr, 6)
+            target = entry + (atr * 2)
+            stop = entry - atr
             reason = f"إشارة صعودية قوية: {candle_signal} + CVD إيجابي + سجل طلبات صاعد."
         elif is_bullish_weak:
             label = "🟢 LONG"
             recommendation = "LONG"
             strength = "Weak"
             entry = price
-            target = round(entry + (atr * 1.5), 6)
-            stop = round(entry - atr, 6)
+            target = entry + (atr * 1.5)
+            stop = entry - atr
             reason = f"إشارة صعودية ضعيفة: {candle_signal} أو CVD إيجابي، لكن الإشارات مختلطة."
         elif is_bearish_strong:
             label = "🔴 SHORT"
             recommendation = "SHORT"
             strength = "Strong"
             entry = price
-            target = round(entry - (atr * 2), 6)
-            stop = round(entry + atr, 6)
+            target = entry - (atr * 2)
+            stop = entry + atr
             reason = f"إشارة هبوطية قوية: {candle_signal} + CVD سلبي + سجل طلبات هابط."
         elif is_bearish_weak:
             label = "🔴 SHORT"
             recommendation = "SHORT"
             strength = "Weak"
             entry = price
-            target = round(entry - (atr * 1.5), 6)
-            stop = round(entry + atr, 6)
+            target = entry - (atr * 1.5)
+            stop = entry + atr
             reason = f"إشارة هبوطية ضعيفة: {candle_signal} أو CVD سلبي، لكن الإشارات مختلطة."
         else:
             label = "⚪ NEUTRAL"
@@ -470,7 +470,6 @@ with header_col2:
         run_analysis_clicked()
         
 # Display last updated time
-# يتم عرض الوقت المحلي لجهازك
 st.markdown(f"**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 st.markdown("---")
 
@@ -505,7 +504,7 @@ if st.session_state.analysis_results:
 
     with main_col3:
         st.markdown(f"<div class='stMetric'>", unsafe_allow_html=True)
-        st.metric(label="Live Price", value=f"{result['raw']['price']:,.4f}" if result['raw']['price'] else "N/A")
+        st.metric(label="Live Price", value=f"{result['raw']['price']:, .4f}" if result['raw']['price'] else "N/A")
         st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("---")
@@ -525,9 +524,9 @@ if st.session_state.analysis_results:
     st.markdown("### 📝 Trade Plan")
     st.markdown(f"**Reason:** {result['reason']}")
     trade_col1, trade_col2, trade_col3 = st.columns(3)
-    trade_col1.metric("Entry Price", f"{result['entry']:,.4f}" if result['entry'] else "N/A")
-    trade_col2.metric("Target Price", f"{result['target']:,.4f}" if result['target'] else "N/A")
-    trade_col3.metric("Stop Loss", f"{result['stop']:,.4f}" if result['stop'] else "N/A")
+    trade_col1.metric("Entry Price", f"{result['entry']:,.4f}" if result['entry'] is not None and not isnan(result['entry']) else "N/A")
+    trade_col2.metric("Target Price", f"{result['target']:,.4f}" if result['target'] is not None and not isnan(result['target']) else "N/A")
+    trade_col3.metric("Stop Loss", f"{result['stop']:,.4f}" if result['stop'] is not None and not isnan(result['stop']) else "N/A")
 
     st.markdown("---")
     st.markdown("### 🔍 Additional Analysis")
