@@ -3,156 +3,742 @@ import requests
 import pandas as pd
 import numpy as np
 import time
-from math import ceil
-import ta
-from textblob import TextBlob
+from math import isnan
+from datetime import datetime
 
-# -----------------------------
-# Configuration & Utilities
-# -----------------------------
-st.set_page_config(page_title="📊 Smart Money Scanner V7", layout="wide")
+# --- كود إضافة صورة الخلفية ---
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background-image: url("https://i.imgur.com/Utvjk6E.png");
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+        /* هذا التعديل الجديد */
+        z-index: -1;
+    }
+    .custom-card {
+        background-color: #F8F8F8;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 15px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        color: #333;
+    }
+    .card-header {
+        font-size: 14px;
+        color: #777;
+        text-transform: uppercase;
+        font-weight: bold;
+    }
+    .card-value {
+        font-size: 28px;
+        font-weight: bold;
+        margin-top: 5px;
+    }
+    .progress-bar-container {
+        background-color: #ddd;
+        border-radius: 50px;
+        height: 10px;
+        width: 100%;
+        margin-top: 10px;
+    }
+    .progress-bar {
+        height: 100%;
+        border-radius: 50px;
+        transition: width 0.5s ease-in-out;
+    }
+    .trade-plan-card {
+        background-color: #f0f0f0;
+        border-left: 5px solid #6A11CB;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 15px;
+    }
+    .trade-plan-title {
+        font-size: 24px;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 15px;
+    }
+    .trade-plan-metric {
+        margin-bottom: 15px;
+    }
+    .trade-plan-metric-label {
+        font-size: 16px;
+        color: #555;
+        font-weight: bold;
+    }
+    .trade-plan-metric-value {
+        font-size: 20px;
+        font-weight: bold;
+    }
+    .reason-card {
+        background-color: #f0f4f7;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 10px;
+        border-left: 4px solid;
+    }
+    .reason-text {
+        font-size: 16px;
+        line-height: 1.6;
+        margin-top: 5px;
+        font-style: italic;
+    }
+    .reason-card.bullish {
+        border-color: #4CAF50;
+        background-color: #f0fbf0;
+        color: #2e7d32;
+    }
+    .reason-card.bearish {
+        border-color: #d32f2f;
+        background-color: #fff0f0;
+        color: #b71c1c;
+    }
+    .reason-card.neutral {
+        border-color: #ff9800;
+        background-color: #fff8f0;
+        color: #e65100;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
-# Symbols to track
-SYMBOLS = ["ARBUSDT", "XRPUSDT", "SOLUSDT", "WIFUSDT", "FARTCOINUSDT", "ANIMEUSDT", "HUMAUSDT", "RESOLVUSDT"]
+OKX_BASE = "https://www.okx.com"
 
-# API placeholders
-OKX_BASE = "https://www.okx.com/api/v5"
-GLASSNODE_API = "YOUR_GLASSNODE_FREE_API_KEY"  # free tier placeholder
-WHALE_ALERT_API = "YOUR_WHALE_ALERT_API_KEY"   # free tier placeholder
+# ----------------------------
+# HTTP helper with retries
+# ----------------------------
+@st.cache_data(ttl=600)
+def okx_get(path, params=None, retries=3, delay=0.6):
+    url = f"{OKX_BASE}{path}"
+    for i in range(retries):
+        try:
+            r = requests.get(url, params=params, timeout=10)
+            if r.status_code == 200:
+                return r.json()
+        except Exception:
+            pass
+        time.sleep(delay * (i + 1))
+    return None
 
-# -----------------------------
-# Core Functions
-# -----------------------------
+# ----------------------------
+# Data fetchers (cached)
+# ----------------------------
+@st.cache_data(ttl=600)
+def fetch_instruments(inst_type="SWAP"):
+    j = okx_get("/api/v5/public/instruments", {"instType": inst_type})
+    if not j or "data" not in j:
+        return []
+    return [d["instId"] for d in j["data"]]
 
-def fetch_klines(symbol, interval="4h", limit=100):
-    url = f"{OKX_BASE}/market/history-candles?instId={symbol}-USDT&bar={interval}&limit={limit}"
-    resp = requests.get(url)
-    data = resp.json().get("data", [])
-    df = pd.DataFrame(data, columns=["timestamp", "open", "high", "low", "close", "volume", "other1", "other2", "other3", "other4"])
-    df["close"] = df["close"].astype(float)
-    df["open"] = df["open"].astype(float)
-    df["high"] = df["high"].astype(float)
-    df["low"] = df["low"].astype(float)
-    df["volume"] = df["volume"].astype(float)
-    df["timestamp"] = pd.to_datetime(df["timestamp"], unit='ms')
-    return df
+@st.cache_data(ttl=45)
+def fetch_ohlcv(instId, bar="1H", limit=200):
+    j = okx_get("/api/v5/market/candles", {"instId": instId, "bar": bar, "limit": str(limit)})
+    if not j or "data" not in j:
+        return pd.DataFrame()
+    df = pd.DataFrame(j["data"], columns=["ts","o","h","l","c","vol","v2","v3","confirm"])
+    for col in ["o","h","l","c","vol"]:
+        df[col] = df[col].astype(float)
+    df["ts"] = pd.to_datetime(df["ts"].astype(int), unit="ms", utc=True)
+    return df.iloc[::-1].reset_index(drop=True)
 
-def compute_technical_indicators(df):
-    # EMA
-    df["ema10"] = ta.trend.EMAIndicator(df["close"], 10).ema_indicator()
-    df["ema50"] = ta.trend.EMAIndicator(df["close"], 50).ema_indicator()
-    # RSI
-    df["rsi"] = ta.momentum.RSIIndicator(df["close"], 14).rsi()
-    # MACD
-    macd = ta.trend.MACD(df["close"])
-    df["macd"] = macd.macd()
-    df["macd_signal"] = macd.macd_signal()
-    # Bollinger Bands
-    bb = ta.volatility.BollingerBands(df["close"])
-    df["bb_high"] = bb.bollinger_hband()
-    df["bb_low"] = bb.bollinger_lband()
-    # ATR
-    df["atr"] = ta.volatility.AverageTrueRange(df["high"], df["low"], df["close"], 14).average_true_range()
-    return df
+@st.cache_data(ttl=20)
+def fetch_ticker(instId):
+    j = okx_get("/api/v5/market/ticker", {"instId": instId})
+    try:
+        return float(j["data"][0]["last"])
+    except Exception:
+        return None
 
-# -----------------------------
-# New Improvements Functions
-# -----------------------------
+@st.cache_data(ttl=60)
+def fetch_funding(instId):
+    j = okx_get("/api/v5/public/funding-rate", {"instId": instId})
+    try:
+        return float(j["data"][0]["fundingRate"])
+    except Exception:
+        return None
 
-# 1 — Fund Flows
-def compute_fund_flows(symbol):
-    # Placeholder logic: difference % between spot & futures volumes
-    spot_vol = np.random.uniform(1000, 5000)
-    futures_vol = np.random.uniform(1000, 5000)
-    flow_ratio = (futures_vol - spot_vol) / max(spot_vol, 1)
-    return flow_ratio
+@st.cache_data(ttl=60)
+def fetch_oi(instId):
+    j = okx_get("/api/v5/public/open-interest", {"instId": instId})
+    try:
+        return float(j["data"][0]["oi"])
+    except Exception:
+        return None
 
-# 2 — On-Chain Metrics
-def compute_onchain_metrics(symbol):
-    # Placeholder: simulate large whale transfers indicator
-    whale_transfers = np.random.randint(0, 5)
-    return whale_transfers
+@st.cache_data(ttl=30)
+def fetch_orderbook(instId, depth=40):
+    j = okx_get("/api/v5/market/books", {"instId": instId, "sz": str(depth)})
+    if not j or "data" not in j:
+        return None, None
+    ob = j["data"][0]
+    def to_df(raw, side):
+        try:
+            df = pd.DataFrame(raw)
+            if df.shape[1] == 2:
+                df.columns = ["price","size"]
+            elif df.shape[1] >= 3:
+                df = df.iloc[:,:3]
+                df.columns = ["price","size","liq"]
+            else:
+                return pd.DataFrame()
+            df = df.astype(float)
+            df["side"] = side
+            return df
+        except Exception:
+            return pd.DataFrame()
+    bids = to_df(ob.get("bids", []), "bid")
+    asks = to_df(ob.get("asks", []), "ask")
+    return bids, asks
 
-# 3 — Sentiment Analysis
-def compute_sentiment(symbol):
-    # Placeholder: get latest news/tweets, compute sentiment
-    sample_texts = [
-        "Market looks bullish for " + symbol,
-        symbol + " facing strong resistance",
-        "Investors are neutral about " + symbol
-    ]
-    scores = [TextBlob(t).sentiment.polarity for t in sample_texts]
-    return np.mean(scores)  # -1 to +1
+@st.cache_data(ttl=30)
+def fetch_trades(instId, limit=400):
+    j = okx_get("/api/v5/market/trades", {"instId": instId, "limit": str(limit)})
+    if not j or "data" not in j:
+        return pd.DataFrame()
+    df = pd.DataFrame(j["data"])
+    rename_map = {}
+    if "px" not in df.columns and "price" in df.columns:
+        rename_map["price"] = "px"
+    if "sz" not in df.columns and "size" in df.columns:
+        rename_map["size"] = "sz"
+    if rename_map:
+        df = df.rename(columns=rename_map)
+    try:
+        df["px"] = pd.to_numeric(df["px"], errors='coerce')
+        df["sz"] = pd.to_numeric(df["sz"], errors='coerce')
+        df["ts"] = pd.to_numeric(df["ts"], errors='coerce')
+        df.dropna(subset=["px", "sz", "ts"], inplace=True)
+        df["px"] = df["px"].astype(float)
+        df["sz"] = df["sz"].astype(float)
+        df["ts"] = pd.to_datetime(df["ts"].astype(int), unit="ms", utc=True, errors='coerce')
+        df.dropna(subset=["ts"], inplace=True)
+        df["side"] = df["side"].astype(str)
+    except Exception:
+        return pd.DataFrame()
+    return df.sort_values("ts").reset_index(drop=True)
 
-# -----------------------------
-# Confidence & Recommendation
-# -----------------------------
-def compute_confidence(df, fund_flow, onchain, sentiment):
-    score = 0
-    # EMA trend
-    score += 0.3 if df["ema10"].iloc[-1] > df["ema50"].iloc[-1] else -0.3
-    # RSI
-    score += 0.2 if df["rsi"].iloc[-1] < 70 else -0.2
-    # MACD
-    score += 0.2 if df["macd"].iloc[-1] > df["macd_signal"].iloc[-1] else -0.2
-    # Bollinger
-    score += 0.1 if df["close"].iloc[-1] < df["bb_low"].iloc[-1] else 0
-    # New indicators
-    score += 0.1 * np.tanh(fund_flow)  # normalize flow
-    score += 0.05 * np.tanh(onchain)
-    score += 0.05 * sentiment
-    return score
+# ----------------------------
+# Metrics
+# ----------------------------
+def compute_cvd(trades_df):
+    if trades_df.empty:
+        return None
+    signed = np.where(trades_df["side"].str.lower()=="buy", trades_df["sz"], -trades_df["sz"])
+    return float(signed.sum())
 
-def generate_trade_signal(df, fund_flow, onchain, sentiment, capital=1000, risk_pct=1):
-    conf = compute_confidence(df, fund_flow, onchain, sentiment)
-    atr = df["atr"].iloc[-1]
-    entry = df["close"].iloc[-1]
-    stop = entry - atr if conf > 0 else entry + atr
-    target = entry + 2*atr if conf > 0 else entry - 2*atr
-    position_size = capital * risk_pct / abs(entry - stop)
-    if conf > 0.1:
-        signal = "BUY"
-    elif conf < -0.1:
-        signal = "SELL"
+def orderbook_imbalance(bids, asks):
+    if bids is None or asks is None or bids.empty or asks.empty:
+        return None
+    bid_vol = bids["size"].sum()
+    ask_vol = asks["size"].sum()
+    return float((bid_vol - ask_vol) / (bid_vol + ask_vol + 1e-9))
+
+def find_liquidity_zones(bids_df, asks_df, price_range_pct=0.01):
+    if bids_df is None or asks_df is None or bids_df.empty or asks_df.empty:
+        return None, None
+    
+    current_price = (bids_df["price"].iloc[0] + asks_df["price"].iloc[0]) / 2
+    
+    bid_zones = bids_df[bids_df["price"] > current_price * (1 - price_range_pct)]
+    ask_zones = asks_df[asks_df["price"] < current_price * (1 + price_range_pct)]
+    
+    top_bids = bid_zones.nlargest(5, "size").to_dict('records')
+    top_asks = ask_zones.nlargest(5, "size").to_dict('records')
+    
+    return top_bids, top_asks
+
+def simple_backtest_winrate(ohlcv_df, lookahead=6, stop_pct=0.01, rr=2.0):
+    if ohlcv_df.empty or len(ohlcv_df) < 80:
+        return None
+    df = ohlcv_df.copy()
+    df["ema20"] = df["c"].ewm(span=20, adjust=False).mean()
+    df["ema50"] = df["c"].ewm(span=50, adjust=False).mean()
+    delta = df["c"].diff()
+    gain = delta.clip(lower=0).rolling(14).mean()
+    loss = (-delta.clip(upper=0)).rolling(14).mean()
+    rs = gain / (loss + 1e-9)
+    df["rsi"] = 100 - (100/(1+rs))
+    wins=losses=0
+    for i in range(50, len(df)-lookahead-1):
+        row = df.iloc[i]
+        cond = (row["ema20"] > row["ema50"]) and (45 <= row["rsi"] <= 70)
+        if not cond:
+            continue
+        entry = row["c"]
+        stop = entry*(1-stop_pct)
+        target = entry*(1+stop_pct*rr)
+        future = df.iloc[i+1:i+1+lookahead]
+        hit_t = future["h"].ge(target).any()
+        hit_s = future["l"].le(stop).any()
+        if hit_t and not hit_s:
+            wins += 1
+        else:
+            losses += 1
+    total = wins + losses
+    return (wins/total) if total>0 else None
+
+def compute_support_resistance(ohlcv_df, window=20):
+    if ohlcv_df.empty:
+        return None, None
+    recent = ohlcv_df[-window:]
+    support = recent["l"].min()
+    resistance = recent["h"].max()
+    return support, resistance
+
+def detect_candle_signal(ohlcv_df, bar):
+    if ohlcv_df.empty or len(ohlcv_df) < 3:
+        return None
+    
+    last = ohlcv_df.iloc[-1]
+    prev = ohlcv_df.iloc[-2]
+    
+    if last["c"] > last["o"] and prev["c"] < prev["o"] and last["c"] > prev["o"] and last["o"] < prev["c"]:
+        return "Bullish Engulfing"
+    if last["c"] < last["o"] and prev["c"] > prev["o"] and last["c"] < prev["o"] and last["o"] > prev["c"]:
+        return "Bearish Engulfing"
+
+    if bar in ["5m", "15m", "1H"]:
+        prev2 = ohlcv_df.iloc[-3]
+        is_bearish_prev2 = prev2["c"] < prev2["o"]
+        is_small_body_prev = abs(prev["o"] - prev["c"]) < ((last["h"] - last["l"]) * 0.2)
+        is_bullish_last = last["c"] > last["o"]
+        
+        if is_bearish_prev2 and is_small_body_prev and is_bullish_last:
+            return "Bullish Morning Star"
+            
+    return None
+
+def calculate_atr(ohlcv_df, period=14):
+    if ohlcv_df.empty or len(ohlcv_df) < period:
+        return None
+    df = ohlcv_df.copy()
+    high = df['h']
+    low = df['l']
+    close = df['c']
+    
+    df['tr1'] = high - low
+    df['tr2'] = abs(high - close.shift(1))
+    df['tr3'] = abs(low - close.shift(1))
+    df['tr'] = df[['tr1', 'tr2', 'tr3']].max(axis=1)
+    
+    atr = df['tr'].rolling(period).mean().iloc[-1]
+    return atr
+
+
+def compute_confidence(instId, bar="1H"):
+    with st.spinner("Computing — gathering live data..."):
+        ohlcv = fetch_ohlcv(instId, bar, limit=300)
+        price = fetch_ticker(instId)
+        funding = fetch_funding(instId)
+        oi = fetch_oi(instId)
+        bids, asks = fetch_orderbook(instId, depth=60)
+        trades = fetch_trades(instId, limit=400)
+    
+    cvd = compute_cvd(trades)
+    ob_imb = orderbook_imbalance(bids, asks)
+    top_bids, top_asks = find_liquidity_zones(bids, asks)
+    bt_win = simple_backtest_winrate(ohlcv, lookahead=6, stop_pct=0.01, rr=2.0)
+    support, resistance = compute_support_resistance(ohlcv)
+    candle_signal = detect_candle_signal(ohlcv, bar)
+
+    # Normalize metrics 0..1
+    fund_score = 0.5 + np.tanh(funding*500)/2 if funding is not None else 0.5
+    oi_score = 0.5 + (np.tanh(np.log1p(oi)/20.0))/2 if oi is not None else 0.5
+    cvd_score = 0.5 + np.tanh(cvd/1e4)/2 if cvd is not None else 0.5
+    ob_score = (ob_imb +1)/2 if ob_imb is not None else 0.5
+    bt_score = bt_win if bt_win is not None else 0.5
+
+    metrics = {"funding": fund_score, "oi": oi_score, "cvd": cvd_score, "orderbook": ob_score, "backtest": bt_score}
+    weights = {"backtest":0.3, "orderbook":0.25, "cvd":0.2, "oi":0.15, "funding":0.1}
+    conf = sum(metrics[k]*weights[k] for k in metrics)
+    confidence_pct = round(max(0, min(conf*100,100)),1)
+    
+    atr = calculate_atr(ohlcv, period=14)
+    if atr is None or price is None:
+        label = "⚠️ Neutral"
+        recommendation = "Wait"
+        entry = price
+        target = stop = None
+        strength = "N/A"
+        reason = "بيانات غير كافية."
+    
     else:
-        signal = "WAIT"
-    return {
-        "signal": signal,
-        "confidence": round(conf, 2),
-        "entry": round(entry, 4),
-        "target": round(target, 4),
-        "stop": round(stop, 4),
-        "position_size": round(position_size, 2)
+        # Define signal strengths
+        is_bullish_strong = (
+            (confidence_pct >= 65) and
+            (cvd is not None and cvd > 0) and
+            (ob_imb is not None and ob_imb > 0) and
+            (candle_signal in ["Bullish Engulfing", "Bullish Morning Star"])
+        )
+        
+        is_bullish_weak = (
+            (confidence_pct >= 50) and
+            ((cvd is not None and cvd > 0) or (candle_signal in ["Bullish Engulfing", "Bullish Morning Star"]))
+        )
+        
+        is_bearish_strong = (
+            (confidence_pct <= 35) and
+            (cvd is not None and cvd < 0) and
+            (ob_imb is not None and ob_imb < 0) and
+            (candle_signal == "Bearish Engulfing")
+        )
+
+        is_bearish_weak = (
+            (confidence_pct <= 50) and
+            ((cvd is not None and cvd < 0) or (candle_signal == "Bearish Engulfing"))
+        )
+        
+        if is_bullish_strong:
+            label = "📈 Bullish"
+            recommendation = "LONG"
+            strength = "Strong"
+            entry = price
+            target = round(entry + (atr * 2), 6)
+            stop = round(entry - atr, 6)
+            reason = f"إشارة صعودية قوية: {candle_signal} + CVD إيجابي + سجل طلبات صاعد."
+        elif is_bullish_weak:
+            label = "📈 Bullish"
+            recommendation = "LONG"
+            strength = "Weak"
+            entry = price
+            target = round(entry + (atr * 1.5), 6)
+            stop = round(entry - atr, 6)
+            reason = f"إشارة صعودية ضعيفة: {candle_signal} أو CVD إيجابي، لكن الإشارات مختلطة."
+        elif is_bearish_strong:
+            label = "📉 Bearish"
+            recommendation = "SHORT"
+            strength = "Strong"
+            entry = price
+            target = round(entry - (atr * 2), 6)
+            stop = round(entry + atr, 6)
+            reason = f"إشارة هبوطية قوية: {candle_signal} + CVD سلبي + سجل طلبات هابط."
+        elif is_bearish_weak:
+            label = "📉 Bearish"
+            recommendation = "SHORT"
+            strength = "Weak"
+            entry = price
+            target = round(entry - (atr * 1.5), 6)
+            stop = round(entry + atr, 6)
+            reason = f"إشارة هبوطية ضعيفة: {candle_signal} أو CVD سلبي، لكن الإشارات مختلطة."
+        else:
+            label = "⚠️ Neutral"
+            recommendation = "Wait"
+            strength = "Neutral"
+            entry = price
+            target = stop = None
+            reason = "لا يوجد سبب مقنع للدخول. المؤشرات متضاربة."
+
+    raw = {"price":price,"funding":funding,"oi":oi,"cvd":cvd,"orderbook_imbalance":ob_imb,"backtest_win":bt_win,"support":support,"resistance":resistance,"candle_signal":candle_signal, "top_bids":top_bids, "top_asks":top_asks, "atr":atr}
+
+    return {"label":label,"confidence_pct":confidence_pct,"recommendation":recommendation,"strength":strength,"entry":entry,"target":target,"stop":stop,"metrics":metrics,"weights":weights,"raw":raw,"reason":reason}
+
+# ----------------------------
+# Streamlit UI
+# ----------------------------
+st.set_page_config(page_title="Smart Money Scanner", layout="wide")
+
+# Helper function to format prices
+def format_price(price, decimals=None):
+    if price is None or isnan(price):
+        return "N/A"
+    if decimals is None:
+        if price >= 1000: decimals = 2
+        elif price >= 10: decimals = 3
+        else: decimals = 4
+    return f"{price:,.{decimals}f}"
+
+# Initialize session state
+if 'analysis_results' not in st.session_state:
+    st.session_state.analysis_results = None
+if 'selected_instId' not in st.session_state:
+    st.session_state.selected_instId = "BTC-USDT-SWAP"
+if 'bar' not in st.session_state:
+    st.session_state.bar = "1H"
+
+# Fetch all instruments once
+all_instruments = fetch_instruments("SWAP") + fetch_instruments("SPOT")
+if not all_instruments:
+    st.error("Unable to load instruments from OKX.")
+    st.stop()
+    
+# Title and Button in the same row
+header_col1, header_col2 = st.columns([0.7, 0.3])
+with header_col1:
+    st.header("🧠 Smart Money Scanner")
+
+def run_analysis_clicked():
+    st.session_state.analysis_results = compute_confidence(st.session_state.selected_instId, st.session_state.bar)
+
+with header_col2:
+    st.markdown("""
+        <style>
+        div.stButton > button {
+            background-image: linear-gradient(to right, #6A11CB, #2575FC);
+            color: white;
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            border: none;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            width: 100%;
+        }
+        div.stButton > button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    if st.button("Go"):
+        run_analysis_clicked()
+        
+# Display last updated time
+st.markdown(f"**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+st.markdown("---")
+
+# User inputs
+st.session_state.selected_instId = st.selectbox("Select Instrument", all_instruments, index=all_instruments.index(st.session_state.selected_instId) if st.session_state.selected_instId in all_instruments else 0)
+st.session_state.bar = st.selectbox("Timeframe", ["30m", "15m", "1H", "6H", "12H"], index=["30m", "15m", "1H", "6H", "12H"].index(st.session_state.bar) if st.session_state.bar in ["30m", "15m", "1H", "6H", "12H"] else 0)
+
+
+# Display results if available
+if st.session_state.analysis_results:
+    result = st.session_state.analysis_results
+    
+    # Custom CSS for the cards and progress bar
+    st.markdown("""
+        <style>
+        .custom-card {
+            background-color: #F8F8F8;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            color: #333;
+        }
+        .card-header {
+            font-size: 14px;
+            color: #777;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+        .card-value {
+            font-size: 28px;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        .progress-bar-container {
+            background-color: #ddd;
+            border-radius: 50px;
+            height: 10px;
+            width: 100%;
+            margin-top: 10px;
+        }
+        .progress-bar {
+            height: 100%;
+            border-radius: 50px;
+            transition: width 0.5s ease-in-out;
+        }
+        .trade-plan-card {
+            background-color: #f0f0f0;
+            border-left: 5px solid #6A11CB;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        .trade-plan-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+        }
+        .trade-plan-metric {
+            margin-bottom: 15px;
+        }
+        .trade-plan-metric-label {
+            font-size: 16px;
+            color: #555;
+            font-weight: bold;
+        }
+        .trade-plan-metric-value {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .reason-card {
+            background-color: #f0f4f7;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid;
+        }
+        .reason-text {
+            font-size: 16px;
+            line-height: 1.6;
+            margin-top: 5px;
+            font-style: italic;
+        }
+        .reason-card.bullish {
+            border-color: #4CAF50;
+            background-color: #f0fbf0;
+            color: #2e7d32;
+        }
+        .reason-card.bearish {
+            border-color: #d32f2f;
+            background-color: #fff0f0;
+            color: #b71c1c;
+        }
+        .reason-card.neutral {
+            border-color: #ff9800;
+            background-color: #fff8f0;
+            color: #e65100;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    # Get the confidence color based on the percentage
+    def get_confidence_color(pct):
+        if pct <= 40: return "red"
+        if pct <= 60: return "orange"
+        return "green"
+
+    confidence_color = get_confidence_color(result['confidence_pct'])
+    progress_width = result['confidence_pct']
+
+    # Get the correct emoji for the recommendation
+    rec_emoji = ""
+    if result['recommendation'] == "LONG":
+        rec_emoji = "🚀"
+    elif result['recommendation'] == "SHORT":
+        rec_emoji = "🔻"
+    else:
+        rec_emoji = "⏳"
+    
+    # Visual alert system
+    if result['confidence_pct'] >= 80:
+        st.balloons()
+        st.success("🎉 إشارة قوية جدًا تم اكتشافها! انتبه لهذه الفرصة.", icon="🔥")
+    elif result['confidence_pct'] <= 20:
+        st.warning("⚠️ إشارة ضعيفة جدًا. يفضل توخي الحذر.")
+        
+    # Display the main metrics in cards
+    cols = st.columns(3)
+    
+    with cols[0]:
+        st.markdown(f"""
+            <div class="custom-card">
+                <div class="card-header">📊 الثقة</div>
+                <div class="card-value">{result['confidence_pct']}%</div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" style="width:{progress_width}%; background-color:{confidence_color};"></div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    with cols[1]:
+        st.markdown(f"""
+            <div class="custom-card">
+                <div class="card-header">⭐ التوصية</div>
+                <div class="card-value">{rec_emoji} {result['recommendation']}</div>
+                <div style="font-size: 14px; color: #999;">({result['strength']})</div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+    with cols[2]:
+        st.markdown(f"""
+            <div class="custom-card">
+                <div class="card-header">📈 السعر الحالي</div>
+                <div class="card-value">{format_price(result['raw']['price'])}</div>
+                <div style="font-size: 14px; color: #999;">{st.session_state.selected_instId}</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("---")
+    
+    # The new, improved Trade Plan section
+    
+    reason_class = "neutral"
+    if "صعودية" in result['reason']:
+        reason_class = "bullish"
+    elif "هبوطية" in result['reason']:
+        reason_class = "bearish"
+
+    st.markdown(f"""
+        <div class="trade-plan-card">
+            <div class="trade-plan-title">📝 Trade Plan</div>
+    """, unsafe_allow_html=True)
+    
+    trade_plan_col1, trade_plan_col2 = st.columns([2, 1])
+    
+    with trade_plan_col1:
+        st.markdown(f"""
+            <div class="reason-card {reason_class}">
+                <div class="trade-plan-metric-label">السبب:</div>
+                <div class="reason-text">{result['reason']}</div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+    with trade_plan_col2:
+        st.markdown(f"""
+            <div class="trade-plan-metric">
+                <div class="trade-plan-metric-label">🔍 سعر الدخول:</div>
+                <div class="trade-plan-metric-value">{format_price(result['entry'])}</div>
+            </div>
+            <div class="trade-plan-metric">
+                <div class="trade-plan-metric-label">🎯 السعر المستهدف:</div>
+                <div class="trade-plan-metric-value">{format_price(result['target'])}</div>
+            </div>
+            <div class="trade-plan-metric">
+                <div class="trade-plan-metric-label">🛑 وقف الخسارة:</div>
+                <div class="trade-plan-metric-value">{format_price(result['stop'])}</div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.markdown("### 📊 المقاييس الأساسية")
+    
+    # ***هذا هو الكود المحدث لحل المشكلة***
+    
+    metrics_data = {
+        "funding": {"label": "التمويل", "value": result["metrics"]["funding"], "weight": result["weights"]["funding"]},
+        "oi": {"label": "OI", "value": result["metrics"]["oi"], "weight": result["weights"]["oi"]},
+        "cvd": {"label": "CVD", "value": result["metrics"]["cvd"], "weight": result["weights"]["cvd"]},
+        "orderbook": {"label": "دفتر الطلبات", "value": result["metrics"]["orderbook"], "weight": result["weights"]["orderbook"]},
+        "backtest": {"label": "الاختبار الخلفي", "value": result["metrics"]["backtest"], "weight": result["weights"]["backtest"]}
     }
 
-# -----------------------------
-# Streamlit UI
-# -----------------------------
-st.title("📊 Smart Money Scanner V7")
-st.write("تحليل العملات الرقمية مع تحسينات التدفقات المالية، On-Chain، وتحليل المشاعر")
+    icons = {"funding":"💰","oi":"📊","cvd":"📈","orderbook":"⚖️","backtest":"🧪"}
+    
+    # هنا تم إضافة حلقة التكرار لإنشاء الأعمدة والمقاييس داخلها
+    cols = st.columns(len(metrics_data))
 
-for symbol in SYMBOLS:
-    df = fetch_klines(symbol)
-    df = compute_technical_indicators(df)
-    fund_flow = compute_fund_flows(symbol)
-    onchain = compute_onchain_metrics(symbol)
-    sentiment = compute_sentiment(symbol)
-    trade = generate_trade_signal(df, fund_flow, onchain, sentiment)
-    
-    # Display Cards
-    st.markdown(f"### {symbol}")
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("توصية", trade["signal"], f"ثقة: {trade['confidence']}")
-    col2.metric("سعر الدخول", trade["entry"])
-    col3.metric("الهدف", trade["target"])
-    col4.metric("وقف الخسارة", trade["stop"])
-    
-    # Extra indicators
-    st.write(f"- تدفق الأموال: {fund_flow:.2f}")
-    st.write(f"- On-Chain (Whale transfers): {onchain}")
-    st.write(f"- مشاعر السوق: {sentiment:.2f}")
-    
-    # Chart
-    st.line_chart(df[["close", "ema10", "ema50"]])
+    for idx, k in enumerate(metrics_data):
+        with cols[idx]:
+            score = metrics_data[k]["value"]
+            weight = metrics_data[k]["weight"]
+            contrib = round(score * weight * 100, 2)
+            
+            # هنا يتم عرض المقياس بشكل صحيح داخل كل عمود
+            st.metric(label=f"{icons[k]} {metrics_data[k]['label']}", value=f"{score:.3f}", delta=f"w={weight}")
+            st.caption(f"Contribution: {contrib}%")
 
-st.write("⚡ جميع المؤشرات محسوبة باستخدام البيانات التاريخية + مؤشرات جديدة لتوصية دقيقة.")
+
+    st.markdown("---")
+    st.markdown("### 🔍 تحليل إضافي")
+    st.markdown(f"• **الدعم:** {format_price(result['raw']['support'])} | **المقاومة:** {format_price(result['raw']['resistance'])}")
+    st.markdown(f"• **إشارة الشمعة:** {result['raw']['candle_signal'] if result['raw']['candle_signal'] else 'لا يوجد'}")
+    
+    show_raw = st.checkbox("عرض المقاييس الخام", value=False)
+    if show_raw:
+        st.markdown("### المقاييس الخام (من أجل الشفافية)")
+        st.json(result["raw"])
+
+else:
+    st.info("حدد الأداة/الإطار الزمني واضغط 'انطلق' للبدء.")
