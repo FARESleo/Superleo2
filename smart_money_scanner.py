@@ -701,28 +701,43 @@ if st.session_state.analysis_results:
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("---")
-    st.markdown("### 📊 Core Metrics")
+    st.markdown("### 📊 المقاييس الأساسية")
+    
+    # ***هذا هو الكود المحدث لحل المشكلة***
+    
+    metrics_data = {
+        "funding": {"label": "التمويل", "value": result["metrics"]["funding"], "weight": result["weights"]["funding"]},
+        "oi": {"label": "OI", "value": result["metrics"]["oi"], "weight": result["weights"]["oi"]},
+        "cvd": {"label": "CVD", "value": result["metrics"]["cvd"], "weight": result["weights"]["cvd"]},
+        "orderbook": {"label": "دفتر الطلبات", "value": result["metrics"]["orderbook"], "weight": result["weights"]["orderbook"]},
+        "backtest": {"label": "الاختبار الخلفي", "value": result["metrics"]["backtest"], "weight": result["weights"]["backtest"]}
+    }
+
     icons = {"funding":"💰","oi":"📊","cvd":"📈","orderbook":"⚖️","backtest":"🧪"}
     
-    # هذا هو الكود الذي تم تعديله ليناسب تنسيق البطاقات بشكل صحيح
-    cols = st.columns(5)
-    for idx, k in enumerate(["funding","oi","cvd","orderbook","backtest"]):
-        col = cols[idx]
-        score = result["metrics"][k]
-        weight = result["weights"][k]
-        contrib = round(score*weight*100,2)
-        col.metric(label=f"{icons[k]} {k.upper()}", value=f"{score:.3f}", delta=f"w={weight}")
-        col.caption(f"Contribution: {contrib}%")
+    # هنا تم إضافة حلقة التكرار لإنشاء الأعمدة والمقاييس داخلها
+    cols = st.columns(len(metrics_data))
+
+    for idx, k in enumerate(metrics_data):
+        with cols[idx]:
+            score = metrics_data[k]["value"]
+            weight = metrics_data[k]["weight"]
+            contrib = round(score * weight * 100, 2)
+            
+            # هنا يتم عرض المقياس بشكل صحيح داخل كل عمود
+            st.metric(label=f"{icons[k]} {metrics_data[k]['label']}", value=f"{score:.3f}", delta=f"w={weight}")
+            st.caption(f"Contribution: {contrib}%")
+
 
     st.markdown("---")
-    st.markdown("### 🔍 Additional Analysis")
-    st.markdown(f"• **Support:** {format_price(result['raw']['support'])} | **Resistance:** {format_price(result['raw']['resistance'])}")
-    st.markdown(f"• **Candle Signal:** {result['raw']['candle_signal'] if result['raw']['candle_signal'] else 'None'}")
+    st.markdown("### 🔍 تحليل إضافي")
+    st.markdown(f"• **الدعم:** {format_price(result['raw']['support'])} | **المقاومة:** {format_price(result['raw']['resistance'])}")
+    st.markdown(f"• **إشارة الشمعة:** {result['raw']['candle_signal'] if result['raw']['candle_signal'] else 'لا يوجد'}")
     
-    show_raw = st.checkbox("Show Raw metrics", value=False)
+    show_raw = st.checkbox("عرض المقاييس الخام", value=False)
     if show_raw:
-        st.markdown("### Raw metrics (for transparency)")
+        st.markdown("### المقاييس الخام (من أجل الشفافية)")
         st.json(result["raw"])
 
 else:
-    st.info("Select instrument/timeframe and press 'Go' to begin.")
+    st.info("حدد الأداة/الإطار الزمني واضغط 'انطلق' للبدء.")
