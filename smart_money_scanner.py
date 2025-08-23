@@ -338,8 +338,8 @@ def compute_confidence(instId, bar="1H"):
 # ----------------------------
 # Streamlit UI
 # ----------------------------
-st.set_page_config(page_title="Smart Money Scanner V4.4", layout="wide")
-st.title("🧠 Smart Money Scanner V4.4 — Dynamic Signals & Tiered Recommendations")
+st.set_page_config(page_title="Smart Money Scanner V4.5", layout="wide")
+st.title("🧠 Smart Money Scanner V4.5 — Bug Fix")
 
 st.sidebar.markdown("### ⚙️ Scanner Settings")
 inst_type = st.sidebar.selectbox("Instrument Type", ["SWAP","SPOT"])
@@ -409,7 +409,8 @@ if st.session_state.run_analysis and st.session_state.instId:
 
     # Display core metrics with icons
     st.markdown("### 📊 Core Metrics")
-    icons = {"funding":"💰","oi":"📊","📈":"📈","orderbook":"⚖️","backtest":"🧪"}
+    # Corrected the icons dictionary keys
+    icons = {"funding":"💰","oi":"📊","cvd":"📈","orderbook":"⚖️","backtest":"🧪"}
     cols = st.columns(5)
     for idx, k in enumerate(["funding","oi","cvd","orderbook","backtest"]):
         col = cols[idx]
