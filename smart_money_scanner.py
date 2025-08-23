@@ -460,6 +460,8 @@ if 'bar' not in st.session_state:
     st.session_state.bar = "1H"
 if 'show_calculator' not in st.session_state:
     st.session_state.show_calculator = False
+if 'show_tracker' not in st.session_state:
+    st.session_state.show_tracker = False
 if 'selected_leverage' not in st.session_state:
     st.session_state.selected_leverage = None
 
@@ -469,8 +471,8 @@ if not all_instruments:
     st.error("Unable to load instruments from OKX.")
     st.stop()
     
-# Title and Button in the same row
-header_col1, header_col2, header_col3 = st.columns([0.6, 0.2, 0.2])
+# Title and Buttons
+header_col1, header_col2, header_col3, header_col4 = st.columns([0.5, 0.2, 0.15, 0.15])
 with header_col1:
     st.header("🧠 Smart Money Scanner")
 
@@ -526,7 +528,33 @@ with header_col3:
         }
         </style>
     """, unsafe_allow_html=True)
-    st.button("Open Calculator", on_click=toggle_calculator, key="calc_button")
+    st.button("Calculator", on_click=toggle_calculator, key="calc_button")
+
+def toggle_tracker():
+    st.session_state.show_tracker = not st.session_state.show_tracker
+
+with header_col4:
+    st.markdown("""
+        <style>
+        div.stButton > button#tracker_button {
+            background-image: linear-gradient(to right, #11c062, #07712d);
+            color: white;
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            border: none;
+            box-shadow: 4px 6px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            width: 100%;
+        }
+        div.stButton > button#tracker_button:hover {
+            transform: translateY(-2px);
+            box-shadow: 6px 10px rgba(0, 0, 0, 0.3);
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    st.button("Tracker", on_click=toggle_tracker, key="tracker_button")
         
 # Display last updated time
 st.markdown(f"**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -541,7 +569,6 @@ st.session_state.bar = st.selectbox("Timeframe", ["30m", "15m", "1H", "6H", "12H
 if st.session_state.analysis_results:
     result = st.session_state.analysis_results
     
-    # Custom CSS for the cards and progress bar
     st.markdown("""
         <style>
         .custom-card {
@@ -850,8 +877,109 @@ def trading_calculator_app():
             liq_color = "red"
             st.markdown(f"**<p style='color: {liq_color}; font-size: 1.5rem;'>سعر التصفية: {liquidation_price:.4f}</p>**", unsafe_allow_html=True)
 
-# Check if calculator should be displayed
-if st.session_state.show_calculator:
+
+# ----------------------------------------------------
+# 🌟 متتبع السوق اللحظي (كود بايثون) 🌟
+# ----------------------------------------------------
+
+@st.cache_data(ttl=60)
+def get_live_market_data():
+    """Fetches live market data from CoinGecko API."""
+    try:
+        all_coins = []
+        for page in range(1, 3):
+            url = f"https://api.coingecko.com/api/v3/coins/markets"
+            params = {
+                "vs_currency": "usd",
+                "order": "market_cap_desc",
+                "per_page": 200,
+                "page": page,
+                "price_change_percentage": "24h"
+            }
+            response = requests.get(url, params=params, timeout=10)
+            if response.status_code == 200:
+                all_coins.extend(response.json())
+            else:
+                st.error(f"Failed to fetch data from CoinGecko. Status code: {response.status_code}")
+                return pd.DataFrame()
+        return pd.DataFrame(all_coins)
+    except Exception as e:
+        st.error(f"Error fetching live data: {e}")
+        return pd.DataFrame()
+
+
+def live_market_tracker():
+    """Renders the Live Market Tracker UI."""
     st.markdown("---")
-    st.subheader("🧮 حاسبة التداول المتقدمة")
+    st.header("📈 متتبع السوق اللحظي")
+    st.write("استكشف العملات ذات التغيرات السعرية الكبيرة خلال الـ 24 ساعة الماضية.")
+
+    # UI Controls
+    cols = st.columns(3)
+    with cols[0]:
+        threshold = st.selectbox("عتبة التغيير (%):", options=[1, 5, 10, 20, 50, 100], index=4)
+    with cols[1]:
+        search_query = st.text_input("ابحث عن عملة...").lower()
+    with cols[2]:
+        filter_type = st.selectbox("الفلتر:", options=["الكل", "صعود فقط", "هبوط فقط"], format_func=lambda x: x)
+
+    # Fetch and filter data
+    with st.spinner("جارٍ تحديث بيانات السوق اللحظية..."):
+        all_coins_df = get_live_market_data()
+
+    if all_coins_df.empty:
+        st.warning("تعذر جلب البيانات. يرجى المحاولة لاحقاً.")
+        return
+
+    # Filter logic
+    filtered_df = all_coins_df[all_coins_df['price_change_percentage_24h'].notna()].copy()
+    filtered_df['price_change_abs'] = filtered_df['price_change_percentage_24h'].abs()
+    filtered_df = filtered_df[filtered_df['price_change_abs'] >= threshold]
+
+    if filter_type == "صعود فقط":
+        filtered_df = filtered_df[filtered_df['price_change_percentage_24h'] > 0]
+    elif filter_type == "هبوط فقط":
+        filtered_df = filtered_df[filtered_df['price_change_percentage_24h'] < 0]
+
+    if search_query:
+        filtered_df = filtered_df[filtered_df['name'].str.lower().str.contains(search_query) | 
+                                 filtered_df['symbol'].str.lower().str.contains(search_query)]
+    
+    # Sort by price change
+    filtered_df = filtered_df.sort_values(by='price_change_abs', ascending=False)
+    
+    if filtered_df.empty:
+        st.info("لا توجد عملات مطابقة للمعايير المحددة.")
+    else:
+        # Prepare data for display
+        display_df = filtered_df[[
+            'name',
+            'symbol',
+            'current_price',
+            'price_change_percentage_24h',
+            'high_24h',
+            'low_24h'
+        ]].rename(columns={
+            'name': 'الاسم',
+            'symbol': 'الرمز',
+            'current_price': 'السعر ($)',
+            'price_change_percentage_24h': 'التغيير (24س) %',
+            'high_24h': 'أعلى سعر (24س) ($)',
+            'low_24h': 'أدنى سعر (24س) ($)'
+        })
+        
+        # Format columns for better readability
+        display_df['السعر ($)'] = display_df['السعر ($)'].apply(lambda x: f"{x:,.4f}" if x > 0.001 else f"{x:,.8f}")
+        display_df['التغيير (24س) %'] = display_df['التغيير (24س) %'].apply(lambda x: f"{x:,.2f}%")
+        display_df['أعلى سعر (24س) ($)'] = display_df['أعلى سعر (24س) ($)'].apply(lambda x: f"{x:,.4f}" if x > 0.001 else f"{x:,.8f}")
+        display_df['أدنى سعر (24س) ($)'] = display_df['أدنى سعر (24س) ($)'].apply(lambda x: f"{x:,.4f}" if x > 0.001 else f"{x:,.8f}")
+        
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
+        st.caption(f"آخر تحديث: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+
+# Check which tool to display based on session state
+if st.session_state.show_calculator:
     trading_calculator_app()
+elif st.session_state.show_tracker:
+    live_market_tracker()
