@@ -257,59 +257,88 @@ def compute_confidence(instId, bar="1H"):
     
     atr = calculate_atr(ohlcv, period=14)
     if atr is None or price is None:
-        label = "⚠️ Neutral / Mixed"
+        label = "⚠️ Neutral"
         recommendation = "Wait"
         entry = price
         target = stop = None
-        reason = "بيانات غير كافية لحساب ATR."
+        strength = "N/A"
+        reason = "بيانات غير كافية."
     
     else:
-        is_bullish_signal = (
-            (confidence_pct >= 60) and
+        # Define signal strengths
+        is_bullish_strong = (
+            (confidence_pct >= 65) and
             (cvd is not None and cvd > 0) and
             (ob_imb is not None and ob_imb > 0) and
             (candle_signal in ["Bullish Engulfing", "Bullish Morning Star"])
         )
         
-        is_bearish_signal = (
-            (confidence_pct <= 40) and
+        is_bullish_weak = (
+            (confidence_pct >= 50) and
+            (cvd is not None and cvd > 0 or candle_signal in ["Bullish Engulfing", "Bullish Morning Star"])
+        )
+        
+        is_bearish_strong = (
+            (confidence_pct <= 35) and
             (cvd is not None and cvd < 0) and
             (ob_imb is not None and ob_imb < 0) and
             (candle_signal == "Bearish Engulfing")
         )
+
+        is_bearish_weak = (
+            (confidence_pct <= 50) and
+            (cvd is not None and cvd < 0 or candle_signal == "Bearish Engulfing")
+        )
         
-        if is_bullish_signal:
+        if is_bullish_strong:
             label = "📈 Bullish"
-            recommendation = "LONG (buy)"
+            recommendation = "LONG"
+            strength = "Strong"
             entry = price
             target = round(entry + (atr * 2), 6)
             stop = round(entry - atr, 6)
             reason = f"إشارة صعودية قوية: {candle_signal} + CVD إيجابي + سجل طلبات صاعد."
-
-        elif is_bearish_signal:
+        elif is_bullish_weak:
+            label = "📈 Bullish"
+            recommendation = "LONG"
+            strength = "Weak"
+            entry = price
+            target = round(entry + (atr * 1.5), 6)
+            stop = round(entry - atr, 6)
+            reason = f"إشارة صعودية ضعيفة: {candle_signal} أو CVD إيجابي، لكن الإشارات مختلطة."
+        elif is_bearish_strong:
             label = "📉 Bearish"
-            recommendation = "SHORT (sell)"
+            recommendation = "SHORT"
+            strength = "Strong"
             entry = price
             target = round(entry - (atr * 2), 6)
             stop = round(entry + atr, 6)
             reason = f"إشارة هبوطية قوية: {candle_signal} + CVD سلبي + سجل طلبات هابط."
-            
+        elif is_bearish_weak:
+            label = "📉 Bearish"
+            recommendation = "SHORT"
+            strength = "Weak"
+            entry = price
+            target = round(entry - (atr * 1.5), 6)
+            stop = round(entry + atr, 6)
+            reason = f"إشارة هبوطية ضعيفة: {candle_signal} أو CVD سلبي، لكن الإشارات مختلطة."
         else:
-            label = "⚠️ Neutral / Mixed"
+            label = "⚠️ Neutral"
             recommendation = "Wait"
+            strength = "Neutral"
             entry = price
             target = stop = None
-            reason = "المؤشرات مختلطة، أو لا يوجد سبب مقنع للدخول في صفقة حاليًا."
+            reason = "لا يوجد سبب مقنع للدخول. المؤشرات متضاربة."
 
     raw = {"price":price,"funding":funding,"oi":oi,"cvd":cvd,"orderbook_imbalance":ob_imb,"backtest_win":bt_win,"support":support,"resistance":resistance,"candle_signal":candle_signal, "top_bids":top_bids, "top_asks":top_asks, "atr":atr}
 
-    return {"label":label,"confidence_pct":confidence_pct,"recommendation":recommendation,"entry":entry,"target":target,"stop":stop,"metrics":metrics,"weights":weights,"raw":raw,"reason":reason}
+    return {"label":label,"confidence_pct":confidence_pct,"recommendation":recommendation,"strength":strength,"entry":entry,"target":target,"stop":stop,"metrics":metrics,"weights":weights,"raw":raw,"reason":reason}
 
 # ----------------------------
 # Streamlit UI
 # ----------------------------
-st.set_page_config(page_title="Smart Money Scanner V4.1", layout="wide")
-st.title("🧠 Smart Money Scanner V4.1 — Flexible Signals & Trade Suggestion")
+st.set_page_config(page_title="Smart Money Scanner V4.2", layout="wide")
+st.title("🧠 Smart Money Scanner V4.2 — Dynamic Signals & Tiered Recommendations")
 
 inst_type = st.sidebar.selectbox("Instrument Type", ["SWAP","SPOT"])
 instruments = fetch_instruments(inst_type)
@@ -324,7 +353,7 @@ if st.sidebar.button("Compute Confidence"):
     result = compute_confidence(instId, bar)
 
     st.subheader(f"{result['label']} — Confidence: {result['confidence_pct']}%")
-    st.markdown(f"### Recommendation: {result['recommendation']}")
+    st.markdown(f"### Recommendation: {result['recommendation']} (Strength: {result['strength']})")
     st.metric("Live Price", f"{result['raw']['price']:,}" if result['raw']['price'] else "N/A")
 
     icons = {"funding":"💰","oi":"📊","cvd":"📈","orderbook":"⚖️","backtest":"🧪"}
@@ -345,7 +374,7 @@ if st.sidebar.button("Compute Confidence"):
     
     st.markdown("---")
     st.markdown("📝 **Trade Suggestion**")
-    st.markdown(f"• Recommendation: {result['recommendation']}")
+    st.markdown(f"• Recommendation: **{result['recommendation']}** ({result['strength']})")
     st.markdown(f"• Reason: **{result['reason']}**")
     st.markdown(f"• Entry: {result['entry']}")
     st.markdown(f"• Target: {result['target'] if result['target'] else 'N/A'}")
