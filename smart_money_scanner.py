@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import time
 from math import isnan
+from datetime import datetime
 
 OKX_BASE = "https://www.okx.com"
 
@@ -25,7 +26,7 @@ def okx_get(path, params=None, retries=3, delay=0.6):
 # ----------------------------
 # Data fetchers (cached)
 # ----------------------------
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=600)
 def fetch_instruments(inst_type="SWAP"):
     j = okx_get("/api/v5/public/instruments", {"instType": inst_type})
     if not j or "data" not in j:
@@ -275,7 +276,7 @@ def compute_confidence(instId, bar="1H"):
         
         is_bullish_weak = (
             (confidence_pct >= 50) and
-            (cvd is not None and cvd > 0 or candle_signal in ["Bullish Engulfing", "Bullish Morning Star"])
+            ((cvd is not None and cvd > 0) or (candle_signal in ["Bullish Engulfing", "Bullish Morning Star"]))
         )
         
         is_bearish_strong = (
@@ -287,7 +288,7 @@ def compute_confidence(instId, bar="1H"):
 
         is_bearish_weak = (
             (confidence_pct <= 50) and
-            (cvd is not None and cvd < 0 or candle_signal == "Bearish Engulfing")
+            ((cvd is not None and cvd < 0) or (candle_signal == "Bearish Engulfing"))
         )
         
         if is_bullish_strong:
@@ -337,25 +338,57 @@ def compute_confidence(instId, bar="1H"):
 # ----------------------------
 # Streamlit UI
 # ----------------------------
-st.set_page_config(page_title="Smart Money Scanner V4.2", layout="wide")
-st.title("🧠 Smart Money Scanner V4.2 — Dynamic Signals & Tiered Recommendations")
+st.set_page_config(page_title="Smart Money Scanner V4.3", layout="wide")
+st.title("🧠 Smart Money Scanner V4.3 — Dynamic Signals & Tiered Recommendations")
 
+st.sidebar.markdown("### ⚙️ Scanner Settings")
 inst_type = st.sidebar.selectbox("Instrument Type", ["SWAP","SPOT"])
 instruments = fetch_instruments(inst_type)
+
 if not instruments:
     st.sidebar.error("Unable to load instruments from OKX.")
     st.stop()
-instId = st.sidebar.selectbox("Instrument", instruments, index=0)
+
+# Use a search box instead of a selectbox for instruments
+instId = st.sidebar.text_input("Search for Instrument", value=instruments[0])
+if instId not in instruments:
+    st.sidebar.warning(f"Instrument '{instId}' not found. Please choose a valid one.")
+    
 bar = st.sidebar.selectbox("Timeframe", ["5m","15m","1H","6H","12H"], index=2)
 show_raw = st.sidebar.checkbox("Show Raw metrics", value=False)
+st.sidebar.markdown("---")
 
-if st.sidebar.button("Compute Confidence"):
+# Use a button to trigger the analysis
+if 'run_analysis' not in st.session_state:
+    st.session_state.run_analysis = False
+
+def run_analysis_clicked():
+    st.session_state.run_analysis = True
+
+st.sidebar.button("Run Analysis", on_click=run_analysis_clicked)
+
+if st.session_state.run_analysis:
     result = compute_confidence(instId, bar)
 
-    st.subheader(f"{result['label']} — Confidence: {result['confidence_pct']}%")
-    st.markdown(f"### Recommendation: {result['recommendation']} (Strength: {result['strength']})")
-    st.metric("Live Price", f"{result['raw']['price']:,}" if result['raw']['price'] else "N/A")
+    st.markdown(f"**_Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_**")
+    
+    # Display the primary recommendation in a clean metric block
+    st.markdown("---")
+    main_col1, main_col2, main_col3 = st.columns(3)
+    
+    with main_col1:
+        st.metric(label=f"{result['label']} Confidence", value=f"{result['confidence_pct']}%")
+    
+    with main_col2:
+        st.metric(label="Recommendation", value=f"{result['recommendation']} ({result['strength']})")
 
+    with main_col3:
+        st.metric(label="Live Price", value=f"{result['raw']['price']:,}" if result['raw']['price'] else "N/A")
+
+    st.markdown("---")
+
+    # Display core metrics with icons
+    st.markdown("### 📊 Core Metrics")
     icons = {"funding":"💰","oi":"📊","cvd":"📈","orderbook":"⚖️","backtest":"🧪"}
     cols = st.columns(5)
     for idx, k in enumerate(["funding","oi","cvd","orderbook","backtest"]):
@@ -367,21 +400,21 @@ if st.sidebar.button("Compute Confidence"):
         col.caption(f"Contribution: {contrib}%")
 
     st.markdown("---")
-    st.markdown("🔎 **Support / Resistance & Candle Signals**")
-    st.markdown(f"• Support (approx): {result['raw']['support']}")
-    st.markdown(f"• Resistance (approx): {result['raw']['resistance']}")
-    st.markdown(f"• Candle Signal: {result['raw']['candle_signal'] if result['raw']['candle_signal'] else 'None'}")
-    
-    st.markdown("---")
-    st.markdown("📝 **Trade Suggestion**")
-    st.markdown(f"• Recommendation: **{result['recommendation']}** ({result['strength']})")
-    st.markdown(f"• Reason: **{result['reason']}**")
-    st.markdown(f"• Entry: {result['entry']}")
-    st.markdown(f"• Target: {result['target'] if result['target'] else 'N/A'}")
-    st.markdown(f"• Stop: {result['stop'] if result['stop'] else 'N/A'}")
+    st.markdown("### 📝 Trade Plan")
+    st.markdown(f"**Reason:** {result['reason']}")
+    trade_col1, trade_col2, trade_col3 = st.columns(3)
+    trade_col1.metric("Entry Price", f"{result['entry']:,}" if result['entry'] else "N/A")
+    trade_col2.metric("Target Price", f"{result['target']:,}" if result['target'] else "N/A")
+    trade_col3.metric("Stop Loss", f"{result['stop']:,}" if result['stop'] else "N/A")
 
+    st.markdown("---")
+    st.markdown("### 🔍 Additional Analysis")
+    st.markdown(f"• **Support:** {result['raw']['support']:,} | **Resistance:** {result['raw']['resistance']:,}")
+    st.markdown(f"• **Candle Signal:** {result['raw']['candle_signal'] if result['raw']['candle_signal'] else 'None'}")
+    
     if show_raw:
         st.markdown("### Raw metrics (for transparency)")
         st.json(result["raw"])
+
 else:
-    st.info("Select instrument/timeframe and press 'Compute Confidence' in the sidebar.")
+    st.info("Select instrument/timeframe and press 'Run Analysis' in the sidebar to begin.")
