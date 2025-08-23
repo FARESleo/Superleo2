@@ -18,6 +18,90 @@ st.markdown(
         /* هذا التعديل الجديد */
         z-index: -1;
     }
+    .custom-card {
+        background-color: #F8F8F8;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 15px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        color: #333;
+    }
+    .card-header {
+        font-size: 14px;
+        color: #777;
+        text-transform: uppercase;
+        font-weight: bold;
+    }
+    .card-value {
+        font-size: 28px;
+        font-weight: bold;
+        margin-top: 5px;
+    }
+    .progress-bar-container {
+        background-color: #ddd;
+        border-radius: 50px;
+        height: 10px;
+        width: 100%;
+        margin-top: 10px;
+    }
+    .progress-bar {
+        height: 100%;
+        border-radius: 50px;
+        transition: width 0.5s ease-in-out;
+    }
+    .trade-plan-card {
+        background-color: #f0f0f0;
+        border-left: 5px solid #6A11CB;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 15px;
+    }
+    .trade-plan-title {
+        font-size: 24px;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 15px;
+    }
+    .trade-plan-metric {
+        margin-bottom: 15px;
+    }
+    .trade-plan-metric-label {
+        font-size: 16px;
+        color: #555;
+        font-weight: bold;
+    }
+    .trade-plan-metric-value {
+        font-size: 20px;
+        font-weight: bold;
+    }
+    .reason-card {
+        background-color: #f0f4f7;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 10px;
+        border-left: 4px solid;
+    }
+    .reason-text {
+        font-size: 16px;
+        line-height: 1.6;
+        margin-top: 5px;
+        font-style: italic;
+    }
+    .reason-card.bullish {
+        border-color: #4CAF50;
+        background-color: #f0fbf0;
+        color: #2e7d32;
+    }
+    .reason-card.bearish {
+        border-color: #d32f2f;
+        background-color: #fff0f0;
+        color: #b71c1c;
+    }
+    .reason-card.neutral {
+        border-color: #ff9800;
+        background-color: #fff8f0;
+        color: #e65100;
+    }
     </style>
     """,
     unsafe_allow_html=True
