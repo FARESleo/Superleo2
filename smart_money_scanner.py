@@ -443,6 +443,22 @@ def compute_confidence(instId, bar="1H"):
 # ----------------------------
 st.set_page_config(page_title="Smart Money Scanner", layout="wide")
 
+# Helper function to format prices dynamically
+def format_price(price):
+    if price is None or isnan(price):
+        return "N/A"
+    
+    price = float(price)
+    
+    if price >= 1000:
+        return f"{price:,.0f}"
+    elif price >= 10:
+        return f"{price:,.2f}"
+    elif price >= 1:
+        return f"{price:,.4f}"
+    else:
+        return f"{price:,.8f}"
+
 # Initialize session state
 if 'analysis_results' not in st.session_state:
     st.session_state.analysis_results = None
@@ -504,10 +520,7 @@ if st.session_state.analysis_results:
 
     with main_col3:
         st.markdown(f"<div class='stMetric'>", unsafe_allow_html=True)
-        # Correctly format live price
-        live_price_val = result['raw']['price']
-        formatted_live_price = f"{live_price_val:,.4f}" if live_price_val is not None and not isnan(live_price_val) else "N/A"
-        st.metric(label="Live Price", value=formatted_live_price)
+        st.metric(label="Live Price", value=format_price(result['raw']['price']))
         st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("---")
@@ -528,27 +541,15 @@ if st.session_state.analysis_results:
     st.markdown(f"**Reason:** {result['reason']}")
     trade_col1, trade_col2, trade_col3 = st.columns(3)
     
-    # Correctly format entry, target, and stop loss prices
-    entry_val = result['entry']
-    target_val = result['target']
-    stop_val = result['stop']
-    
-    formatted_entry = f"{entry_val:,.4f}" if entry_val is not None and not isnan(entry_val) else "N/A"
-    formatted_target = f"{target_val:,.4f}" if target_val is not None and not isnan(target_val) else "N/A"
-    formatted_stop = f"{stop_val:,.4f}" if stop_val is not None and not isnan(stop_val) else "N/A"
-    
-    trade_col1.metric("Entry Price", formatted_entry)
-    trade_col2.metric("Target Price", formatted_target)
-    trade_col3.metric("Stop Loss", formatted_stop)
+    trade_col1.metric("Entry Price", format_price(result['entry']))
+    trade_col2.metric("Target Price", format_price(result['target']))
+    trade_col3.metric("Stop Loss", format_price(result['stop']))
 
     st.markdown("---")
     st.markdown("### 🔍 Additional Analysis")
     
-    # Correctly format support and resistance prices
-    support_val = result['raw']['support']
-    resistance_val = result['raw']['resistance']
-    formatted_support = f"{support_val:,.4f}" if support_val is not None and not isnan(support_val) else "N/A"
-    formatted_resistance = f"{resistance_val:,.4f}" if resistance_val is not None and not isnan(resistance_val) else "N/A"
+    formatted_support = format_price(result['raw']['support'])
+    formatted_resistance = format_price(result['raw']['resistance'])
     
     st.markdown(f"• **Support:** {formatted_support} | **Resistance:** {formatted_resistance}")
     st.markdown(f"• **Candle Signal:** {result['raw']['candle_signal'] if result['raw']['candle_signal'] else 'None'}")
