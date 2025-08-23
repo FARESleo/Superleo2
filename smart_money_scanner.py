@@ -341,6 +341,16 @@ def compute_confidence(instId, bar="1H"):
 # ----------------------------
 st.set_page_config(page_title="Smart Money Scanner", layout="wide")
 
+# Helper function to format prices
+def format_price(price, decimals=None):
+    if price is None or isnan(price):
+        return "N/A"
+    if decimals is None:
+        if price >= 1000: decimals = 2
+        elif price >= 10: decimals = 3
+        else: decimals = 4
+    return f"{price:,.{decimals}f}"
+
 # Initialize session state
 if 'analysis_results' not in st.session_state:
     st.session_state.analysis_results = None
@@ -458,9 +468,33 @@ if st.session_state.analysis_results:
             font-size: 20px;
             font-weight: bold;
         }
+        .reason-card {
+            background-color: #f0f4f7;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid;
+        }
         .reason-text {
             font-size: 16px;
             line-height: 1.6;
+            margin-top: 5px;
+            font-style: italic;
+        }
+        .reason-card.bullish {
+            border-color: #4CAF50;
+            background-color: #f0fbf0;
+            color: #2e7d32;
+        }
+        .reason-card.bearish {
+            border-color: #d32f2f;
+            background-color: #fff0f0;
+            color: #b71c1c;
+        }
+        .reason-card.neutral {
+            border-color: #ff9800;
+            background-color: #fff8f0;
+            color: #e65100;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -517,32 +551,33 @@ if st.session_state.analysis_results:
         st.markdown(f"""
             <div class="custom-card">
                 <div class="card-header">📈 السعر الحالي</div>
-                <div class="card-value">{result['raw']['price']:,}</div>
+                <div class="card-value">{format_price(result['raw']['price'])}</div>
                 <div style="font-size: 14px; color: #999;">{st.session_state.selected_instId}</div>
             </div>
         """, unsafe_allow_html=True)
 
     st.markdown("---")
-
+    
     # The new, improved Trade Plan section
-    st.markdown("""
+    
+    reason_class = "neutral"
+    if "صعودية" in result['reason']:
+        reason_class = "bullish"
+    elif "هبوطية" in result['reason']:
+        reason_class = "bearish"
+
+    st.markdown(f"""
         <div class="trade-plan-card">
             <div class="trade-plan-title">📝 Trade Plan</div>
     """, unsafe_allow_html=True)
     
-    reason_color = "#555"
-    if "صعودية" in result['reason']:
-        reason_color = "#28a745"
-    elif "هبوطية" in result['reason']:
-        reason_color = "#dc3545"
-        
     trade_plan_col1, trade_plan_col2 = st.columns([2, 1])
     
     with trade_plan_col1:
         st.markdown(f"""
-            <div class="trade-plan-metric">
+            <div class="reason-card {reason_class}">
                 <div class="trade-plan-metric-label">السبب:</div>
-                <div class="reason-text" style="color: {reason_color};">{result['reason']}</div>
+                <div class="reason-text">{result['reason']}</div>
             </div>
         """, unsafe_allow_html=True)
         
@@ -550,15 +585,15 @@ if st.session_state.analysis_results:
         st.markdown(f"""
             <div class="trade-plan-metric">
                 <div class="trade-plan-metric-label">سعر الدخول:</div>
-                <div class="trade-plan-metric-value">{result['entry']:,}</div>
+                <div class="trade-plan-metric-value">{format_price(result['entry'])}</div>
             </div>
             <div class="trade-plan-metric">
                 <div class="trade-plan-metric-label">السعر المستهدف:</div>
-                <div class="trade-plan-metric-value">{result['target']:,}</div>
+                <div class="trade-plan-metric-value">{format_price(result['target'])}</div>
             </div>
             <div class="trade-plan-metric">
                 <div class="trade-plan-metric-label">وقف الخسارة:</div>
-                <div class="trade-plan-metric-value">{result['stop']:,}</div>
+                <div class="trade-plan-metric-value">{format_price(result['stop'])}</div>
             </div>
         """, unsafe_allow_html=True)
         
@@ -578,7 +613,7 @@ if st.session_state.analysis_results:
 
     st.markdown("---")
     st.markdown("### 🔍 Additional Analysis")
-    st.markdown(f"• **Support:** {result['raw']['support']:,} | **Resistance:** {result['raw']['resistance']:,}")
+    st.markdown(f"• **Support:** {format_price(result['raw']['support'])} | **Resistance:** {format_price(result['raw']['resistance'])}")
     st.markdown(f"• **Candle Signal:** {result['raw']['candle_signal'] if result['raw']['candle_signal'] else 'None'}")
     
     show_raw = st.checkbox("Show Raw metrics", value=False)
