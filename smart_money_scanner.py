@@ -15,7 +15,6 @@ st.markdown(
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
-        /* هذا التعديل الجديد */
         z-index: -1;
     }
     .custom-card {
@@ -459,6 +458,8 @@ if 'selected_instId' not in st.session_state:
     st.session_state.selected_instId = "BTC-USDT-SWAP"
 if 'bar' not in st.session_state:
     st.session_state.bar = "1H"
+if 'show_calculator' not in st.session_state:
+    st.session_state.show_calculator = False
 
 # Fetch all instruments once
 all_instruments = fetch_instruments("SWAP") + fetch_instruments("SPOT")
@@ -467,7 +468,7 @@ if not all_instruments:
     st.stop()
     
 # Title and Button in the same row
-header_col1, header_col2 = st.columns([0.7, 0.3])
+header_col1, header_col2, header_col3 = st.columns([0.6, 0.2, 0.2])
 with header_col1:
     st.header("🧠 Smart Money Scanner")
 
@@ -497,6 +498,32 @@ with header_col2:
     """, unsafe_allow_html=True)
     if st.button("Go"):
         run_analysis_clicked()
+        
+def toggle_calculator():
+    st.session_state.show_calculator = not st.session_state.show_calculator
+
+with header_col3:
+    st.markdown("""
+        <style>
+        div.stButton > button#calc_button {
+            background-image: linear-gradient(to right, #FFA17F, #FF4B2B);
+            color: white;
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            border: none;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            width: 100%;
+        }
+        div.stButton > button#calc_button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    st.button("Open Calculator", on_click=toggle_calculator, key="calc_button")
         
 # Display last updated time
 st.markdown(f"**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -742,3 +769,375 @@ if st.session_state.analysis_results:
 
 else:
     st.info("حدد الأداة/الإطار الزمني واضغط 'انطلق' للبدء.")
+
+# The Trading Calculator HTML Code
+calculator_html = """
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <title>حاسبة التداول المتقدمة</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg-color: #0d1117;
+      --card-bg: #161b22;
+      --input-bg: #21262d;
+      --text-color: #c9d1d9;
+      --primary-color: #58a6ff;
+      --success-color: #3fb950;
+      --danger-color: #f85149;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg-color);
+      color: var(--text-color);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      direction: rtl;
+    }
+    .card {
+      background: var(--card-bg);
+      padding: 30px;
+      border-radius: 20px;
+      width: 500px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      border: 1px solid #30363d;
+      max-width: 90%;
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 25px;
+      color: var(--primary-color);
+      font-weight: 600;
+    }
+    label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 15px 0 5px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .tooltip-icon {
+      font-weight: bold;
+      color: var(--primary-color);
+      cursor: pointer;
+      font-size: 16px;
+      position: relative;
+    }
+    .tooltip-text {
+      visibility: hidden;
+      width: 200px;
+      background-color: var(--input-bg);
+      color: var(--text-color);
+      text-align: center;
+      border-radius: 6px;
+      padding: 10px;
+      position: absolute;
+      z-index: 1;
+      right: 0;
+      top: 120%;
+      opacity: 0;
+      transition: opacity 0.3s;
+      font-size: 12px;
+      line-height: 1.5;
+      border: 1px solid #444c56;
+    }
+    .tooltip-icon:hover .tooltip-text {
+      visibility: visible;
+      opacity: 1;
+    }
+    input, select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid var(--input-bg);
+      border-radius: 10px;
+      background: var(--input-bg);
+      color: var(--text-color);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.2);
+    }
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .btn-group button {
+      flex: 1;
+      padding: 10px;
+      background: var(--input-bg);
+      border: 1px solid #444c56;
+      border-radius: 8px;
+      color: var(--text-color);
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .btn-group button.active, .btn-group button:hover {
+      background: var(--primary-color);
+      border-color: var(--primary-color);
+      color: #fff;
+    }
+    #calculateBtn {
+      width: 100%;
+      padding: 15px;
+      background: var(--primary-color);
+      border: none;
+      border-radius: 12px;
+      color: var(--bg-color);
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #calculateBtn:hover {
+      background: #478bff;
+    }
+    .results {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 15px;
+      margin-top: 25px;
+    }
+    .box {
+      background: var(--input-bg);
+      padding: 15px;
+      border-radius: 12px;
+      text-align: center;
+      font-weight: 500;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 70px;
+    }
+    .box-label {
+      font-size: 12px;
+      color: #8b949e;
+      margin-bottom: 5px;
+    }
+    .box-value {
+      font-size: 18px;
+      font-weight: bold;
+    }
+    .profit { color: var(--success-color); } 
+    .loss { color: var(--danger-color); } 
+    .info { color: var(--primary-color); }
+    canvas {
+      margin-top: 25px;
+      background-color: #21262d;
+      border-radius: 12px;
+      padding: 15px;
+      border: 1px solid #30363d;
+    }
+    .close-btn {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: #f85149;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        font-size: 20px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>📊 حاسبة التداول المتقدمة</h2>
+    <label>الهامش المبدئي (IMR %)
+      <span class="tooltip-icon">i<span class="tooltip-text">النسبة المئوية من إجمالي قيمة الصفقة التي تودعها.</span></span>
+    </label>
+    <input type="number" id="imr" placeholder="مثال: 2" oninput="updateUI()">
+    <label>هامش الحِفاظ (MMR %)
+      <span class="tooltip-icon">i<span class="tooltip-text">الحد الأدنى من الهامش المطلوب للحفاظ على الصفقة.</span></span>
+    </label>
+    <input type="number" id="mmr" placeholder="مثال: 1" oninput="updateUI()">
+    <label>اختر الرافعة المالية</label>
+    <div id="leverageButtons" class="btn-group"></div>
+    <label>المبلغ (USDT)</label>
+    <input type="number" id="capital" placeholder="مثال: 10" oninput="updateUI()">
+    <label>السعر الحالي</label>
+    <input type="number" id="currentPrice" placeholder="مثال: 1.00" oninput="updateUI()">
+    <label>سعر الهدف</label>
+    <input type="number" id="targetPrice" placeholder="مثال: 1.05" oninput="updateUI()">
+    <label>الاتجاه</label>
+    <select id="direction" onchange="updateUI()">
+      <option value="long">📈 شراء (Long)</option>
+      <option value="short">📉 بيع (Short)</option>
+    </select>
+    <div class="results">
+      <div class="box info">
+        <div class="box-label">فرق الهامش</div>
+        <div class="box-value" id="marginDiff">-</div>
+      </div>
+      <div class="box info">
+        <div class="box-label">التغير %</div>
+        <div class="box-value" id="priceChangeBox">-</div>
+      </div>
+      <div class="box profit">
+        <div class="box-label">ROI %</div>
+        <div class="box-value" id="roiBox">-</div>
+      </div>
+      <div class="box info">
+        <div class="box-label">PnL USDT</div>
+        <div class="box-value" id="pnlBox">-</div>
+      </div>
+      <div class="box loss">
+        <div class="box-label">سعر التصفية</div>
+        <div class="box-value" id="liqBox">-</div>
+      </div>
+    </div>
+    <canvas id="chart" height="120"></canvas>
+  </div>
+  <script>
+    let chart;
+    let selectedLeverage = null;
+    function updateUI() {
+      updateLeverageOptions();
+      calculate();
+    }
+    function updateLeverageOptions() {
+      const imr = parseFloat(document.getElementById("imr").value);
+      const mmr = parseFloat(document.getElementById("mmr").value);
+      const btnContainer = document.getElementById("leverageButtons");
+      btnContainer.innerHTML = "";
+      if (isNaN(imr) || isNaN(mmr) || imr <= mmr || imr <= 0) {
+        selectedLeverage = null;
+        return;
+      }
+      const marginDifference = imr - mmr;
+      const maxLeverage = 100 / marginDifference;
+      const leverageOptions = [
+        { value: 5, text: `5x (منخفضة)` },
+        { value: 10, text: `10x (منخفضة)` },
+        { value: 20, text: `20x (متوسطة)` },
+        { value: 30, text: `30x (متوسطة)` },
+        { value: 50, text: `50x (عالية)` },
+        { value: 100, text: `100x (عالية جداً)` }
+      ];
+      leverageOptions.forEach(option => {
+        if (maxLeverage >= option.value) {
+          const btn = document.createElement("button");
+          btn.textContent = option.text;
+          btn.value = option.value;
+          btn.onclick = () => {
+            selectedLeverage = option.value;
+            document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            calculate();
+          };
+          btnContainer.appendChild(btn);
+        }
+      });
+      const maxBtn = document.createElement("button");
+      maxBtn.textContent = `${maxLeverage.toFixed(2)}x (القصوى)`;
+      maxBtn.value = maxLeverage;
+      maxBtn.onclick = () => {
+        selectedLeverage = maxLeverage;
+        document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+        maxBtn.classList.add('active');
+        calculate();
+      };
+      btnContainer.appendChild(maxBtn);
+    }
+    function calculate() {
+      const imr = parseFloat(document.getElementById("imr").value);
+      const mmr = parseFloat(document.getElementById("mmr").value);
+      const capital = parseFloat(document.getElementById("capital").value);
+      const currentPrice = parseFloat(document.getElementById("currentPrice").value);
+      const targetPrice = parseFloat(document.getElementById("targetPrice").value);
+      const direction = document.getElementById("direction").value;
+      
+      if (selectedLeverage === null || [imr, mmr, capital, currentPrice, targetPrice].some(isNaN) || imr <= mmr || imr <= 0) {
+        document.getElementById("marginDiff").innerHTML = '-';
+        document.getElementById("priceChangeBox").innerHTML = '-';
+        document.getElementById("roiBox").innerHTML = '-';
+        document.getElementById("pnlBox").innerHTML = '-';
+        document.getElementById("liqBox").innerHTML = '-';
+        if (chart) chart.destroy();
+        return;
+      }
+      const leverage = selectedLeverage;
+      const marginDiff = imr - mmr;
+      const priceChange = ((targetPrice - currentPrice) / currentPrice) * 100;
+      const actualPriceChange = direction === "short" ? -priceChange : priceChange;
+      const roiPercent = actualPriceChange * leverage;
+      const pnlValue = (capital * roiPercent) / 100;
+      let liquidationPrice;
+      if (direction === "long") {
+        liquidationPrice = currentPrice * (1 - (marginDiff / 100));
+      } else {
+        liquidationPrice = currentPrice * (1 + (marginDiff / 100));
+      }
+      document.getElementById("marginDiff").innerHTML = `${marginDiff.toFixed(2)}%`;
+      document.getElementById("priceChangeBox").innerHTML = `${actualPriceChange.toFixed(2)}%`;
+      document.getElementById("roiBox").innerHTML = `${roiPercent.toFixed(2)}%`;
+      document.getElementById("pnlBox").innerHTML = `${pnlValue.toFixed(2)} USDT`;
+      document.getElementById("liqBox").innerHTML = `${liquidationPrice.toFixed(4)}`;
+      let ctx = document.getElementById("chart").getContext("2d");
+      if (chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: ["السعر الحالي", "الهدف", "التصفية"],
+          datasets: [{
+            label: "السعر",
+            data: [currentPrice, targetPrice, liquidationPrice],
+            borderColor: "#58a6ff",
+            backgroundColor: "#58a6ff",
+            tension: 0.3,
+            fill: false
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            x: { 
+              ticks: { color: "#c9d1d9" },
+              grid: { color: "rgba(201, 209, 217, 0.1)" }
+            },
+            y: { 
+              ticks: { color: "#c9d1d9" },
+              grid: { color: "rgba(201, 209, 217, 0.1)" }
+            }
+          }
+        }
+      });
+    }
+    window.onload = updateUI;
+  </script>
+</body>
+</html>
+"""
+
+# The HTML component to be rendered as a floating popup
+floating_calculator_html = f"""
+<div style="position: fixed; bottom: 20px; right: 20px; z-index: 9999; background: #161b22; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); width: 500px; max-width: 90%; padding: 30px;">
+    <button onclick="parent.Streamlit.setComponentValue('hide_calculator')" class="close-btn">×</button>
+    {calculator_html}
+</div>
+"""
+
+if st.session_state.show_calculator:
+    # Use st.components.v1.html for more control and to handle JavaScript
+    # Note: This is an advanced use case and requires special setup if run locally.
+    # For simplicity, we'll use st.html for the floating popup.
+    st.html(floating_calculator_html)
