@@ -473,6 +473,15 @@ if st.session_state.analysis_results:
 
     confidence_color = get_confidence_color(result['confidence_pct'])
     progress_width = result['confidence_pct']
+
+    # Get the correct emoji for the recommendation
+    rec_emoji = ""
+    if result['recommendation'] == "LONG":
+        rec_emoji = "🚀"
+    elif result['recommendation'] == "SHORT":
+        rec_emoji = "🔻"
+    else:
+        rec_emoji = "⏳"
     
     # Visual alert system
     if result['confidence_pct'] >= 80:
@@ -499,7 +508,7 @@ if st.session_state.analysis_results:
         st.markdown(f"""
             <div class="custom-card">
                 <div class="card-header">⭐ التوصية</div>
-                <div class="card-value">{result['recommendation']}</div>
+                <div class="card-value">{rec_emoji} {result['recommendation']}</div>
                 <div style="font-size: 14px; color: #999;">({result['strength']})</div>
             </div>
         """, unsafe_allow_html=True)
