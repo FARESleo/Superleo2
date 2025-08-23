@@ -584,15 +584,15 @@ if st.session_state.analysis_results:
     with trade_plan_col2:
         st.markdown(f"""
             <div class="trade-plan-metric">
-                <div class="trade-plan-metric-label">سعر الدخول:</div>
+                <div class="trade-plan-metric-label">🔍 سعر الدخول:</div>
                 <div class="trade-plan-metric-value">{format_price(result['entry'])}</div>
             </div>
             <div class="trade-plan-metric">
-                <div class="trade-plan-metric-label">السعر المستهدف:</div>
+                <div class="trade-plan-metric-label">🎯 السعر المستهدف:</div>
                 <div class="trade-plan-metric-value">{format_price(result['target'])}</div>
             </div>
             <div class="trade-plan-metric">
-                <div class="trade-plan-metric-label">وقف الخسارة:</div>
+                <div class="trade-plan-metric-label">🛑 وقف الخسارة:</div>
                 <div class="trade-plan-metric-value">{format_price(result['stop'])}</div>
             </div>
         """, unsafe_allow_html=True)
