@@ -364,7 +364,27 @@ def run_analysis_clicked():
     st.session_state.analysis_results = compute_confidence(st.session_state.selected_instId, st.session_state.bar)
 
 with header_col2:
-    if st.button("Get Analysis"):
+    st.markdown("""
+        <style>
+        div.stButton > button {
+            background-image: linear-gradient(to right, #6A11CB, #2575FC);
+            color: white;
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            border: none;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            width: 100%;
+        }
+        div.stButton > button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    if st.button("Go"):
         run_analysis_clicked()
         
 # Display last updated time
@@ -412,6 +432,35 @@ if st.session_state.analysis_results:
             height: 100%;
             border-radius: 50px;
             transition: width 0.5s ease-in-out;
+        }
+        .trade-plan-card {
+            background-color: #f0f0f0;
+            border-left: 5px solid #6A11CB;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        .trade-plan-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+        }
+        .trade-plan-metric {
+            margin-bottom: 15px;
+        }
+        .trade-plan-metric-label {
+            font-size: 16px;
+            color: #555;
+            font-weight: bold;
+        }
+        .trade-plan-metric-value {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .reason-text {
+            font-size: 16px;
+            line-height: 1.6;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -466,6 +515,47 @@ if st.session_state.analysis_results:
 
     st.markdown("---")
 
+    # The new, improved Trade Plan section
+    st.markdown("""
+        <div class="trade-plan-card">
+            <div class="trade-plan-title">📝 Trade Plan</div>
+    """, unsafe_allow_html=True)
+    
+    reason_color = "#555"
+    if "صعودية" in result['reason']:
+        reason_color = "#28a745"
+    elif "هبوطية" in result['reason']:
+        reason_color = "#dc3545"
+        
+    trade_plan_col1, trade_plan_col2 = st.columns([2, 1])
+    
+    with trade_plan_col1:
+        st.markdown(f"""
+            <div class="trade-plan-metric">
+                <div class="trade-plan-metric-label">السبب:</div>
+                <div class="reason-text" style="color: {reason_color};">{result['reason']}</div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+    with trade_plan_col2:
+        st.markdown(f"""
+            <div class="trade-plan-metric">
+                <div class="trade-plan-metric-label">سعر الدخول:</div>
+                <div class="trade-plan-metric-value">{result['entry']:,}</div>
+            </div>
+            <div class="trade-plan-metric">
+                <div class="trade-plan-metric-label">السعر المستهدف:</div>
+                <div class="trade-plan-metric-value">{result['target']:,}</div>
+            </div>
+            <div class="trade-plan-metric">
+                <div class="trade-plan-metric-label">وقف الخسارة:</div>
+                <div class="trade-plan-metric-value">{result['stop']:,}</div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("---")
     st.markdown("### 📊 Core Metrics")
     icons = {"funding":"💰","oi":"📊","cvd":"📈","orderbook":"⚖️","backtest":"🧪"}
     cols = st.columns(5)
@@ -478,14 +568,6 @@ if st.session_state.analysis_results:
         col.caption(f"Contribution: {contrib}%")
 
     st.markdown("---")
-    st.markdown("### 📝 Trade Plan")
-    st.markdown(f"**Reason:** {result['reason']}")
-    trade_col1, trade_col2, trade_col3 = st.columns(3)
-    trade_col1.metric("Entry Price", f"{result['entry']:,}" if result['entry'] else "N/A")
-    trade_col2.metric("Target Price", f"{result['target']:,}" if result['target'] else "N/A")
-    trade_col3.metric("Stop Loss", f"{result['stop']:,}" if result['stop'] else "N/A")
-
-    st.markdown("---")
     st.markdown("### 🔍 Additional Analysis")
     st.markdown(f"• **Support:** {result['raw']['support']:,} | **Resistance:** {result['raw']['resistance']:,}")
     st.markdown(f"• **Candle Signal:** {result['raw']['candle_signal'] if result['raw']['candle_signal'] else 'None'}")
@@ -496,4 +578,4 @@ if st.session_state.analysis_results:
         st.json(result["raw"])
 
 else:
-    st.info("Select instrument/timeframe and press 'Get Analysis' to begin.")
+    st.info("Select instrument/timeframe and press 'Go' to begin.")
