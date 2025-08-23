@@ -124,7 +124,7 @@ st.markdown(
         padding-top: 100px; /* Adjust this value to match header height */
     }
     
-    /* Make buttons and columns work together */
+    /* Buttons styling - removed width:100% to allow side-by-side layout */
     div.stButton > button {
         background-image: linear-gradient(to right, #6A11CB, #2575FC);
         color: white;
@@ -135,7 +135,6 @@ st.markdown(
         border: none;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
         transition: transform 0.2s ease, box-shadow 0.2s ease;
-        width: 100%;
         cursor: pointer;
     }
     div.stButton > button:hover {
@@ -149,10 +148,6 @@ st.markdown(
         background-image: linear-gradient(to right, #11c062, #07712d);
     }
     
-    /* Adjust columns spacing for a better side-by-side layout */
-    .st-emotion-cache-1r6y4y1 {
-        gap: 15px !important;
-    }
     </style>
     """,
     unsafe_allow_html=True
@@ -520,26 +515,26 @@ if not all_instruments:
     st.error("Unable to load instruments from OKX.")
     st.stop()
     
-# --- شريط علوي ثابت مع الأزرار ---
-st.markdown("<h1 style='font-size: 2.5rem; font-weight: bold; margin: 0; padding: 0;'>🧠 Smart Money Scanner</h1>", unsafe_allow_html=True)
+# --- الشريط العلوي الثابت مع الأزرار ---
+st.markdown("<h1 style='font-size: 2.5rem; font-weight: bold; margin: 0;'>🧠 Smart Money Scanner</h1>", unsafe_allow_html=True)
 header_col1, header_col2, header_col3 = st.columns(3)
 
 def run_analysis_clicked():
     st.session_state.analysis_results = compute_confidence(st.session_state.selected_instId, st.session_state.bar)
-
-with header_col1:
-    if st.button("🚀 Go"):
-        run_analysis_clicked()
-        
+    
 def toggle_calculator():
     st.session_state.show_calculator = not st.session_state.show_calculator
     st.session_state.selected_leverage = None
 
-with header_col2:
-    st.button("🧮 Calculator", on_click=toggle_calculator, key="calc_button")
-
 def toggle_tracker():
     st.session_state.show_tracker = not st.session_state.show_tracker
+    
+with header_col1:
+    if st.button("🚀 Go"):
+        run_analysis_clicked()
+
+with header_col2:
+    st.button("🧮 Calculator", on_click=toggle_calculator, key="calc_button")
 
 with header_col3:
     st.button("📊 Tracker", on_click=toggle_tracker, key="tracker_button")
@@ -883,3 +878,5 @@ def live_market_tracker():
 # Check which tool to display based on session state
 if st.session_state.show_calculator:
     trading_calculator_app()
+elif st.session_state.show_tracker:
+    live_market_tracker()
