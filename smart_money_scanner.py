@@ -504,10 +504,10 @@ if st.session_state.analysis_results:
 
     with main_col3:
         st.markdown(f"<div class='stMetric'>", unsafe_allow_html=True)
-        # SCRIPT FIX: Ensure value is not None or NaN before formatting
-        val = result['raw']['price']
-        formatted_val = f"{val:,.4f}" if val is not None and not isnan(val) else "N/A"
-        st.metric(label="Live Price", value=formatted_val)
+        # Correctly format live price
+        live_price_val = result['raw']['price']
+        formatted_live_price = f"{live_price_val:,.4f}" if live_price_val is not None and not isnan(live_price_val) else "N/A"
+        st.metric(label="Live Price", value=formatted_live_price)
         st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("---")
@@ -527,18 +527,29 @@ if st.session_state.analysis_results:
     st.markdown("### 📝 Trade Plan")
     st.markdown(f"**Reason:** {result['reason']}")
     trade_col1, trade_col2, trade_col3 = st.columns(3)
-    # SCRIPT FIX: Ensure values are not None or NaN before formatting
-    trade_col1.metric("Entry Price", f"{result['entry']:,.4f}" if result['entry'] is not None and not isnan(result['entry']) else "N/A")
-    trade_col2.metric("Target Price", f"{result['target']:,.4f}" if result['target'] is not None and not isnan(result['target']) else "N/A")
-    trade_col3.metric("Stop Loss", f"{result['stop']:,.4f}" if result['stop'] is not None and not isnan(result['stop']) else "N/A")
+    
+    # Correctly format entry, target, and stop loss prices
+    entry_val = result['entry']
+    target_val = result['target']
+    stop_val = result['stop']
+    
+    formatted_entry = f"{entry_val:,.4f}" if entry_val is not None and not isnan(entry_val) else "N/A"
+    formatted_target = f"{target_val:,.4f}" if target_val is not None and not isnan(target_val) else "N/A"
+    formatted_stop = f"{stop_val:,.4f}" if stop_val is not None and not isnan(stop_val) else "N/A"
+    
+    trade_col1.metric("Entry Price", formatted_entry)
+    trade_col2.metric("Target Price", formatted_target)
+    trade_col3.metric("Stop Loss", formatted_stop)
 
     st.markdown("---")
     st.markdown("### 🔍 Additional Analysis")
-    # SCRIPT FIX: Ensure values are not None or NaN before formatting
+    
+    # Correctly format support and resistance prices
     support_val = result['raw']['support']
     resistance_val = result['raw']['resistance']
     formatted_support = f"{support_val:,.4f}" if support_val is not None and not isnan(support_val) else "N/A"
     formatted_resistance = f"{resistance_val:,.4f}" if resistance_val is not None and not isnan(resistance_val) else "N/A"
+    
     st.markdown(f"• **Support:** {formatted_support} | **Resistance:** {formatted_resistance}")
     st.markdown(f"• **Candle Signal:** {result['raw']['candle_signal'] if result['raw']['candle_signal'] else 'None'}")
     
