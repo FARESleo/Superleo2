@@ -106,39 +106,34 @@ def fetch_trades(instId, limit=400):
     if rename_map:
         df = df.rename(columns=rename_map)
     try:
+        df["px"] = pd.to_numeric(df["px"], errors='coerce')
+        df["sz"] = pd.to_numeric(df["sz"], errors='coerce')
+        df["ts"] = pd.to_numeric(df["ts"], errors='coerce')
+        df.dropna(subset=["px", "sz", "ts"], inplace=True)
         df["px"] = df["px"].astype(float)
         df["sz"] = df["sz"].astype(float)
+        df["ts"] = pd.to_datetime(df["ts"].astype(int), unit="ms", utc=True, errors='coerce')
+        df.dropna(subset=["ts"], inplace=True)
         df["side"] = df["side"].astype(str)
-        df["ts"] = pd.to_datetime(df["ts"].astype(int), unit="ms", utc=True)
     except Exception:
-        pass
+        return pd.DataFrame()
     return df.sort_values("ts").reset_index(drop=True)
 
 # ----------------------------
 # Metrics
 # ----------------------------
-def compute_cvd_and_delta(trades_df, ohlcv_df, bar_interval):
-    if trades_df.empty or ohlcv_df.empty:
-        return None, None
-    
-    trades_df["px"] = trades_df["px"].astype(float)
-    trades_df["sz"] = trades_df["sz"].astype(float)
-    trades_df["ts"] = pd.to_datetime(trades_df["ts"].astype(int), unit="ms", utc=True)
-    ohlcv_df["ts"] = pd.to_datetime(ohlcv_df["ts"].astype(int), unit="ms", utc=True)
-    
-    signed_sz = np.where(trades_df["side"].str.lower()=="buy", trades_df["sz"], -trades_df["sz"])
-    trades_df["signed_sz"] = signed_sz
-    
-    trades_df.set_index("ts", inplace=True)
-    delta_per_candle = trades_df["signed_sz"].resample(bar_interval).sum()
-    
-    matched_delta = pd.merge(ohlcv_df, delta_per_candle, how="left", left_on="ts", right_index=True)
-    matched_delta.rename(columns={"signed_sz": "delta"}, inplace=True)
-    matched_delta["delta"] = matched_delta["delta"].fillna(0)
-    
-    cvd = matched_delta["delta"].cumsum()
-    
-    return float(cvd.iloc[-1]), matched_delta["delta"]
+def compute_cvd(trades_df):
+    if trades_df.empty:
+        return None
+    signed = np.where(trades_df["side"].str.lower()=="buy", trades_df["sz"], -trades_df["sz"])
+    return float(signed.sum())
+
+def orderbook_imbalance(bids, asks):
+    if bids is None or asks is None or bids.empty or asks.empty:
+        return None
+    bid_vol = bids["size"].sum()
+    ask_vol = asks["size"].sum()
+    return float((bid_vol - ask_vol) / (bid_vol + ask_vol + 1e-9))
 
 def find_liquidity_zones(bids_df, asks_df, price_range_pct=0.01):
     if bids_df is None or asks_df is None or bids_df.empty or asks_df.empty:
@@ -153,13 +148,6 @@ def find_liquidity_zones(bids_df, asks_df, price_range_pct=0.01):
     top_asks = ask_zones.nlargest(5, "size").to_dict('records')
     
     return top_bids, top_asks
-
-def orderbook_imbalance(bids, asks):
-    if bids is None or asks is None or bids.empty or asks.empty:
-        return None
-    bid_vol = bids["size"].sum()
-    ask_vol = asks["size"].sum()
-    return float((bid_vol - ask_vol) / (bid_vol + ask_vol + 1e-9))
 
 def simple_backtest_winrate(ohlcv_df, lookahead=6, stop_pct=0.01, rr=2.0):
     if ohlcv_df.empty or len(ohlcv_df) < 80:
@@ -248,7 +236,7 @@ def compute_confidence(instId, bar="1H"):
         bids, asks = fetch_orderbook(instId, depth=60)
         trades = fetch_trades(instId, limit=400)
     
-    cvd_total, delta_series = compute_cvd_and_delta(trades, ohlcv, bar)
+    cvd = compute_cvd(trades)
     ob_imb = orderbook_imbalance(bids, asks)
     top_bids, top_asks = find_liquidity_zones(bids, asks)
     bt_win = simple_backtest_winrate(ohlcv, lookahead=6, stop_pct=0.01, rr=2.0)
@@ -258,7 +246,7 @@ def compute_confidence(instId, bar="1H"):
     # Normalize metrics 0..1
     fund_score = 0.5 + np.tanh(funding*500)/2 if funding is not None else 0.5
     oi_score = 0.5 + (np.tanh(np.log1p(oi)/20.0))/2 if oi is not None else 0.5
-    cvd_score = 0.5 + np.tanh(cvd_total/1e4)/2 if cvd_total is not None else 0.5
+    cvd_score = 0.5 + np.tanh(cvd/1e4)/2 if cvd is not None else 0.5
     ob_score = (ob_imb +1)/2 if ob_imb is not None else 0.5
     bt_score = bt_win if bt_win is not None else 0.5
 
@@ -278,15 +266,15 @@ def compute_confidence(instId, bar="1H"):
     else:
         is_bullish_signal = (
             (confidence_pct >= 60) and
-            (cvd_total > 0) and
-            (ob_imb > 0) and
+            (cvd is not None and cvd > 0) and
+            (ob_imb is not None and ob_imb > 0) and
             (candle_signal in ["Bullish Engulfing", "Bullish Morning Star"])
         )
         
         is_bearish_signal = (
             (confidence_pct <= 40) and
-            (cvd_total < 0) and
-            (ob_imb < 0) and
+            (cvd is not None and cvd < 0) and
+            (ob_imb is not None and ob_imb < 0) and
             (candle_signal == "Bearish Engulfing")
         )
         
@@ -313,15 +301,15 @@ def compute_confidence(instId, bar="1H"):
             target = stop = None
             reason = "المؤشرات مختلطة، أو لا يوجد سبب مقنع للدخول في صفقة حاليًا."
 
-    raw = {"price":price,"funding":funding,"oi":oi,"cvd":cvd_total,"orderbook_imbalance":ob_imb,"backtest_win":bt_win,"support":support,"resistance":resistance,"candle_signal":candle_signal, "top_bids":top_bids, "top_asks":top_asks, "atr":atr}
+    raw = {"price":price,"funding":funding,"oi":oi,"cvd":cvd,"orderbook_imbalance":ob_imb,"backtest_win":bt_win,"support":support,"resistance":resistance,"candle_signal":candle_signal, "top_bids":top_bids, "top_asks":top_asks, "atr":atr}
 
     return {"label":label,"confidence_pct":confidence_pct,"recommendation":recommendation,"entry":entry,"target":target,"stop":stop,"metrics":metrics,"weights":weights,"raw":raw,"reason":reason}
 
 # ----------------------------
 # Streamlit UI
 # ----------------------------
-st.set_page_config(page_title="Smart Money Scanner V4.0", layout="wide")
-st.title("🧠 Smart Money Scanner V4.0 — Flexible Signals & Trade Suggestion")
+st.set_page_config(page_title="Smart Money Scanner V4.1", layout="wide")
+st.title("🧠 Smart Money Scanner V4.1 — Flexible Signals & Trade Suggestion")
 
 inst_type = st.sidebar.selectbox("Instrument Type", ["SWAP","SPOT"])
 instruments = fetch_instruments(inst_type)
