@@ -954,6 +954,36 @@ calculator_html = """
         align-items: center;
         justify-content: center;
     }
+    /* Mobile Responsiveness */
+    @media (max-width: 600px) {
+        .card {
+            width: 100%;
+            padding: 20px;
+            border-radius: 0;
+            box-shadow: none;
+        }
+        .btn-group {
+            flex-direction: column;
+        }
+        .btn-group button {
+            width: 100%;
+        }
+        .results {
+            grid-template-columns: 1fr;
+        }
+        .st-html-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100% !important;
+            height: 100% !important;
+            z-index: 10000;
+            overflow-y: auto;
+            background: var(--bg-color); /* Match background for smooth transition */
+            padding: 0;
+            border-radius: 0;
+        }
+    }
   </style>
 </head>
 <body>
@@ -1130,7 +1160,21 @@ calculator_html = """
 
 # The HTML component to be rendered as a floating popup
 floating_calculator_html = f"""
-<div style="position: fixed; bottom: 20px; right: 20px; z-index: 9999; background: #161b22; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); width: 500px; max-width: 90%; padding: 30px;">
+<div style="
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 9999;
+    background: #161b22;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    width: 500px;
+    max-width: 90%;
+    padding: 30px;
+    overflow-y: auto;
+    max-height: 90vh;
+">
     <button onclick="parent.Streamlit.setComponentValue('hide_calculator')" class="close-btn">×</button>
     {calculator_html}
 </div>
@@ -1138,6 +1182,4 @@ floating_calculator_html = f"""
 
 if st.session_state.show_calculator:
     # Use st.components.v1.html for more control and to handle JavaScript
-    # Note: This is an advanced use case and requires special setup if run locally.
-    # For simplicity, we'll use st.html for the floating popup.
-    st.html(floating_calculator_html)
+    st.components.v1.html(floating_calculator_html, height=700, scrolling=True)
