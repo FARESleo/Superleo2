@@ -9,117 +9,9 @@ from datetime import datetime
 OKX_BASE = "https://www.okx.com"
 
 # ----------------------------
-# CSS Styling for high-contrast minimal design
-# ----------------------------
-st.markdown("""
-<style>
-/* Main app container */
-.css-18e3th9 {
-    padding-top: 1rem;
-    padding-bottom: 5rem;
-    padding-left: 1rem;
-    padding-right: 1rem;
-    background-color: #000000; /* Pure black background for max contrast */
-    color: #FFFFFF; /* Pure white text */
-}
-
-/* Hide Streamlit's default hamburger menu */
-#MainMenu {visibility: hidden;}
-
-/* Style the header and buttons */
-.css-1av0ku6, .css-1y480o3, .css-1d374r {
-    padding-top: 0.5rem;
-    padding-bottom: 0.5rem;
-}
-
-/* Card-like containers for sections */
-.stCard {
-    background-color: rgba(26, 26, 26, 0.7); /* Semi-transparent background */
-    backdrop-filter: blur(10px); /* Frosted glass effect */
-    border-radius: 10px;
-    padding: 20px;
-    margin-bottom: 20px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.1); /* Subtle white border */
-}
-
-/* Metrics styling */
-.stMetric {
-    background-color: rgba(255, 255, 255, 0.05); /* Very subtle gray for metrics */
-    border-radius: 8px;
-    padding: 10px;
-    text-align: center;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    transition: transform 0.2s ease-in-out, border-color 0.2s ease-in-out;
-}
-.stMetric:hover {
-    transform: translateY(-3px);
-    border: 1px solid #007BFF; /* Blue glow on hover */
-}
-.stMetric .st-bd .st-b5 {
-    color: #FFFFFF !important; /* Make metric value pure white */
-    font-size: 2em;
-    font-weight: 700;
-}
-.stMetric .st-bd .st-at {
-    color: #B0B0B0 !important; /* Light gray for labels */
-}
-
-/* Color coding for metrics */
-.stMetric.bullish {
-    border-left: 5px solid #28A745; /* Bright green border */
-}
-.stMetric.bearish {
-    border-left: 5px solid #DC3545; /* Bright red border */
-}
-.stMetric.neutral {
-    border-left: 5px solid #6c757d; /* Gray for neutrality */
-}
-
-/* Font and text color */
-html, body, .st-emotion-cache-12oz5g7, .st-emotion-cache-1r651o3 {
-    color: #FFFFFF !important;
-    font-family: 'Segoe UI', 'Roboto', sans-serif;
-}
-
-/* Headings */
-h1, h2, h3, h4, h5, h6 {
-    color: #007BFF; /* Blue for headings */
-    border-bottom: 2px solid #007BFF;
-    padding-bottom: 5px;
-    margin-bottom: 15px;
-}
-
-/* Buttons */
-.stButton>button {
-    background-color: #007BFF;
-    color: #FFFFFF;
-    font-weight: bold;
-    border-radius: 8px;
-    border: none;
-    padding: 10px 20px;
-    transition: background-color 0.2s ease-in-out;
-}
-.stButton>button:hover {
-    background-color: #0056b3;
-}
-
-/* Special styles for main headers */
-.st-emotion-cache-1d374r {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.st-emotion-cache-1d374r h1 {
-    border-bottom: none;
-    margin-bottom: 0;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# ----------------------------
 # HTTP helper with retries
 # ----------------------------
+@st.cache_data(ttl=600)
 def okx_get(path, params=None, retries=3, delay=0.6):
     url = f"{OKX_BASE}{path}"
     for i in range(retries):
@@ -466,7 +358,7 @@ if not all_instruments:
 # Title and Button in the same row
 header_col1, header_col2 = st.columns([0.7, 0.3])
 with header_col1:
-    st.markdown("<h1><span style='font-size: 2.2rem;'>🧠 Smart Money Scanner</span></h1>", unsafe_allow_html=True)
+    st.header("🧠 Smart Money Scanner")
 
 def run_analysis_clicked():
     st.session_state.analysis_results = compute_confidence(st.session_state.selected_instId, st.session_state.bar)
@@ -475,60 +367,32 @@ with header_col2:
     if st.button("Get Analysis"):
         run_analysis_clicked()
         
-# User inputs
-st.markdown("---")
-col1, col2 = st.columns(2)
-with col1:
-    st.session_state.selected_instId = st.selectbox(
-        "Select Instrument",
-        all_instruments,
-        index=all_instruments.index(st.session_state.selected_instId) if st.session_state.selected_instId in all_instruments else 0
-    )
-with col2:
-    st.session_state.bar = st.selectbox(
-        "Timeframe",
-        ["5m", "15m", "1H", "6H", "12H"],
-        index=["5m", "15m", "1H", "6H", "12H"].index(st.session_state.bar) if st.session_state.bar in ["5m", "15m", "1H", "6H", "12H"] else 2
-    )
+# Display last updated time
 st.markdown(f"**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+st.markdown("---")
+
+# User inputs
+st.session_state.selected_instId = st.selectbox("Select Instrument", all_instruments, index=all_instruments.index(st.session_state.selected_instId) if st.session_state.selected_instId in all_instruments else 0)
+st.session_state.bar = st.selectbox("Timeframe", ["5m", "15m", "1H", "6H", "12H"], index=["5m", "15m", "1H", "6H", "12H"].index(st.session_state.bar) if st.session_state.bar in ["5m", "15m", "1H", "6H", "12H"] else 2)
 
 # Display results if available
 if st.session_state.analysis_results:
     result = st.session_state.analysis_results
     
     st.markdown("---")
-
-    # Main metrics with color coding
-    color_class = ""
-    if "Bullish" in result['label']:
-        color_class = "bullish"
-    elif "Bearish" in result['label']:
-        color_class = "bearish"
-    else:
-        color_class = "neutral"
-
-    st.markdown(f"<div class='stCard'>", unsafe_allow_html=True)
-    st.markdown("### 📈 Analysis Overview")
     main_col1, main_col2, main_col3 = st.columns(3)
     
     with main_col1:
-        st.markdown(f"<div class='stMetric {color_class}'>", unsafe_allow_html=True)
         st.metric(label=f"Confidence", value=f"{result['confidence_pct']}%", delta=result['label'])
-        st.markdown("</div>", unsafe_allow_html=True)
     
     with main_col2:
-        st.markdown(f"<div class='stMetric'>", unsafe_allow_html=True)
         st.metric(label="Recommendation", value=f"{result['recommendation']} ({result['strength']})")
-        st.markdown("</div>", unsafe_allow_html=True)
 
     with main_col3:
-        st.markdown(f"<div class='stMetric'>", unsafe_allow_html=True)
         st.metric(label="Live Price", value=f"{result['raw']['price']:,}" if result['raw']['price'] else "N/A")
-        st.markdown("</div>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
 
-    # Core Metrics
-    st.markdown(f"<div class='stCard'>", unsafe_allow_html=True)
+    st.markdown("---")
+
     st.markdown("### 📊 Core Metrics")
     icons = {"funding":"💰","oi":"📊","cvd":"📈","orderbook":"⚖️","backtest":"🧪"}
     cols = st.columns(5)
@@ -537,30 +401,22 @@ if st.session_state.analysis_results:
         score = result["metrics"][k]
         weight = result["weights"][k]
         contrib = round(score*weight*100,2)
-        with col:
-            st.markdown(f"<div class='stMetric'>", unsafe_allow_html=True)
-            st.metric(label=f"{icons[k]} {k.upper()}", value=f"{score:.3f}", delta=f"w={weight}")
-            st.caption(f"Contribution: {contrib}%")
-            st.markdown("</div>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+        col.metric(label=f"{icons[k]} {k.upper()}", value=f"{score:.3f}", delta=f"w={weight}")
+        col.caption(f"Contribution: {contrib}%")
 
-    # Trade Plan
-    st.markdown(f"<div class='stCard'>", unsafe_allow_html=True)
+    st.markdown("---")
     st.markdown("### 📝 Trade Plan")
     st.markdown(f"**Reason:** {result['reason']}")
     trade_col1, trade_col2, trade_col3 = st.columns(3)
     trade_col1.metric("Entry Price", f"{result['entry']:,}" if result['entry'] else "N/A")
     trade_col2.metric("Target Price", f"{result['target']:,}" if result['target'] else "N/A")
     trade_col3.metric("Stop Loss", f"{result['stop']:,}" if result['stop'] else "N/A")
-    st.markdown("</div>", unsafe_allow_html=True)
 
-    # Additional Analysis
-    st.markdown(f"<div class='stCard'>", unsafe_allow_html=True)
+    st.markdown("---")
     st.markdown("### 🔍 Additional Analysis")
     st.markdown(f"• **Support:** {result['raw']['support']:,} | **Resistance:** {result['raw']['resistance']:,}")
     st.markdown(f"• **Candle Signal:** {result['raw']['candle_signal'] if result['raw']['candle_signal'] else 'None'}")
-    st.markdown("</div>", unsafe_allow_html=True)
-
+    
     show_raw = st.checkbox("Show Raw metrics", value=False)
     if show_raw:
         st.markdown("### Raw metrics (for transparency)")
