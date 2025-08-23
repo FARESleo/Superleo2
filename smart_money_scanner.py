@@ -9,111 +9,9 @@ from datetime import datetime
 OKX_BASE = "https://www.okx.com"
 
 # ----------------------------
-# CSS Styling for high-contrast minimal design
-# ----------------------------
-st.markdown("""
-<style>
-/* Main app container */
-.css-18e3th9 {
-    padding-top: 1rem;
-    padding-bottom: 5rem;
-    padding-left: 1rem;
-    padding-right: 1rem;
-    background-color: #000000; /* Pure black background for max contrast */
-    color: #FFFFFF; /* Pure white text */
-}
-
-/* Hide Streamlit's default hamburger menu */
-#MainMenu {visibility: hidden;}
-
-/* Card-like containers for sections */
-.stCard {
-    background-color: rgba(26, 26, 26, 0.7); /* Semi-transparent background */
-    backdrop-filter: blur(10px); /* Frosted glass effect */
-    border-radius: 10px;
-    padding: 20px;
-    margin-bottom: 20px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.1); /* Subtle white border */
-}
-
-/* Metrics styling */
-.stMetric {
-    background-color: rgba(255, 255, 255, 0.05); /* Very subtle gray for metrics */
-    border-radius: 8px;
-    padding: 10px;
-    text-align: center;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    transition: transform 0.2s ease-in-out, border-color 0.2s ease-in-out;
-}
-.stMetric:hover {
-    transform: translateY(-3px);
-    border: 1px solid #007BFF; /* Blue glow on hover */
-}
-.stMetric .st-bd .st-b5 {
-    color: #FFFFFF !important; /* Make metric value pure white */
-    font-size: 2em;
-    font-weight: 700;
-}
-.stMetric .st-bd .st-at {
-    color: #B0B0B0 !important; /* Light gray for labels */
-}
-
-/* Color coding for metrics */
-.stMetric.long {
-    border-left: 5px solid #28A745; /* Bright green border */
-}
-.stMetric.short {
-    border-left: 5px solid #DC3545; /* Bright red border */
-}
-.stMetric.neutral {
-    border-left: 5px solid #6c757d; /* Gray for neutrality */
-}
-
-/* Font and text color */
-html, body, .st-emotion-cache-12oz5g7, .st-emotion-cache-1r651o3 {
-    color: #FFFFFF !important;
-    font-family: 'Segoe UI', 'Roboto', sans-serif;
-}
-
-/* Headings */
-h1, h2, h3, h4, h5, h6 {
-    color: #007BFF; /* Blue for headings */
-    border-bottom: 2px solid #007BFF;
-    padding-bottom: 5px;
-    margin-bottom: 15px;
-}
-
-/* Buttons */
-.stButton>button {
-    background-color: #007BFF;
-    color: #FFFFFF;
-    font-weight: bold;
-    border-radius: 8px;
-    border: none;
-    padding: 10px 20px;
-    transition: background-color 0.2s ease-in-out;
-}
-.stButton>button:hover {
-    background-color: #0056b3;
-}
-
-/* Special styles for main headers */
-.st-emotion-cache-1d374r {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.st-emotion-cache-1d374r h1 {
-    border-bottom: none;
-    margin-bottom: 0;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# ----------------------------
 # HTTP helper with retries
 # ----------------------------
+@st.cache_data(ttl=600)
 def okx_get(path, params=None, retries=3, delay=0.6):
     url = f"{OKX_BASE}{path}"
     for i in range(retries):
@@ -395,39 +293,39 @@ def compute_confidence(instId, bar="1H"):
         )
         
         if is_bullish_strong:
-            label = "🟢 LONG"
+            label = "📈 Bullish"
             recommendation = "LONG"
             strength = "Strong"
             entry = price
-            target = entry + (atr * 2)
-            stop = entry - atr
+            target = round(entry + (atr * 2), 6)
+            stop = round(entry - atr, 6)
             reason = f"إشارة صعودية قوية: {candle_signal} + CVD إيجابي + سجل طلبات صاعد."
         elif is_bullish_weak:
-            label = "🟢 LONG"
+            label = "📈 Bullish"
             recommendation = "LONG"
             strength = "Weak"
             entry = price
-            target = entry + (atr * 1.5)
-            stop = entry - atr
+            target = round(entry + (atr * 1.5), 6)
+            stop = round(entry - atr, 6)
             reason = f"إشارة صعودية ضعيفة: {candle_signal} أو CVD إيجابي، لكن الإشارات مختلطة."
         elif is_bearish_strong:
-            label = "🔴 SHORT"
+            label = "📉 Bearish"
             recommendation = "SHORT"
             strength = "Strong"
             entry = price
-            target = entry - (atr * 2)
-            stop = entry + atr
+            target = round(entry - (atr * 2), 6)
+            stop = round(entry + atr, 6)
             reason = f"إشارة هبوطية قوية: {candle_signal} + CVD سلبي + سجل طلبات هابط."
         elif is_bearish_weak:
-            label = "🔴 SHORT"
+            label = "📉 Bearish"
             recommendation = "SHORT"
             strength = "Weak"
             entry = price
-            target = entry - (atr * 1.5)
-            stop = entry + atr
+            target = round(entry - (atr * 1.5), 6)
+            stop = round(entry + atr, 6)
             reason = f"إشارة هبوطية ضعيفة: {candle_signal} أو CVD سلبي، لكن الإشارات مختلطة."
         else:
-            label = "⚪ NEUTRAL"
+            label = "⚠️ Neutral"
             recommendation = "Wait"
             strength = "Neutral"
             entry = price
@@ -442,22 +340,6 @@ def compute_confidence(instId, bar="1H"):
 # Streamlit UI
 # ----------------------------
 st.set_page_config(page_title="Smart Money Scanner", layout="wide")
-
-# Helper function to format prices dynamically
-def format_price(price):
-    if price is None or isnan(price):
-        return "N/A"
-    
-    price = float(price)
-    
-    if price >= 1000:
-        return f"{price:,.0f}"
-    elif price >= 10:
-        return f"{price:,.2f}"
-    elif price >= 1:
-        return f"{price:,.4f}"
-    else:
-        return f"{price:,.8f}"
 
 # Initialize session state
 if 'analysis_results' not in st.session_state:
@@ -499,29 +381,15 @@ if st.session_state.analysis_results:
     
     st.markdown("---")
     main_col1, main_col2, main_col3 = st.columns(3)
-
-    # Determine CSS class for the metric
-    if "LONG" in result['recommendation']:
-        metric_class = "long"
-    elif "SHORT" in result['recommendation']:
-        metric_class = "short"
-    else:
-        metric_class = "neutral"
     
     with main_col1:
-        st.markdown(f"<div class='stMetric {metric_class}'>", unsafe_allow_html=True)
         st.metric(label=f"Confidence", value=f"{result['confidence_pct']}%", delta=result['label'])
-        st.markdown("</div>", unsafe_allow_html=True)
     
     with main_col2:
-        st.markdown(f"<div class='stMetric'>", unsafe_allow_html=True)
         st.metric(label="Recommendation", value=f"{result['recommendation']} ({result['strength']})")
-        st.markdown("</div>", unsafe_allow_html=True)
 
     with main_col3:
-        st.markdown(f"<div class='stMetric'>", unsafe_allow_html=True)
-        st.metric(label="Live Price", value=format_price(result['raw']['price']))
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.metric(label="Live Price", value=f"{result['raw']['price']:,}" if result['raw']['price'] else "N/A")
 
     st.markdown("---")
 
@@ -540,18 +408,13 @@ if st.session_state.analysis_results:
     st.markdown("### 📝 Trade Plan")
     st.markdown(f"**Reason:** {result['reason']}")
     trade_col1, trade_col2, trade_col3 = st.columns(3)
-    
-    trade_col1.metric("Entry Price", format_price(result['entry']))
-    trade_col2.metric("Target Price", format_price(result['target']))
-    trade_col3.metric("Stop Loss", format_price(result['stop']))
+    trade_col1.metric("Entry Price", f"{result['entry']:,}" if result['entry'] else "N/A")
+    trade_col2.metric("Target Price", f"{result['target']:,}" if result['target'] else "N/A")
+    trade_col3.metric("Stop Loss", f"{result['stop']:,}" if result['stop'] else "N/A")
 
     st.markdown("---")
     st.markdown("### 🔍 Additional Analysis")
-    
-    formatted_support = format_price(result['raw']['support'])
-    formatted_resistance = format_price(result['raw']['resistance'])
-    
-    st.markdown(f"• **Support:** {formatted_support} | **Resistance:** {formatted_resistance}")
+    st.markdown(f"• **Support:** {result['raw']['support']:,} | **Resistance:** {result['raw']['resistance']:,}")
     st.markdown(f"• **Candle Signal:** {result['raw']['candle_signal'] if result['raw']['candle_signal'] else 'None'}")
     
     show_raw = st.checkbox("Show Raw metrics", value=False)
