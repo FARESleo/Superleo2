@@ -339,8 +339,7 @@ def compute_confidence(instId, bar="1H"):
 # ----------------------------
 # Streamlit UI
 # ----------------------------
-st.set_page_config(page_title="Smart Money Scanner V4.6", layout="wide")
-st.title("🧠 Smart Money Scanner V4.6 — Redesigned UI")
+st.set_page_config(page_title="Smart Money Scanner", layout="wide")
 
 # Initialize session state for analysis results and selected instrument
 if 'analysis_results' not in st.session_state:
@@ -356,38 +355,50 @@ if not all_instruments:
     st.error("Unable to load instruments from OKX.")
     st.stop()
 
-# Header for UI elements
-st.markdown("### ⚙️ Scanner Controls")
+# Use a single, clean header for the main title
+st.header("🧠 Smart Money Scanner")
 
-# Create two columns for controls
+# Create two columns for controls at the top
 col1, col2 = st.columns(2)
 
 with col1:
-    st.session_state.selected_instId = st.selectbox("Select Instrument", all_instruments, index=all_instruments.index("BTC-USDT-SWAP") if "BTC-USDT-SWAP" in all_instruments else 0)
+    st.session_state.selected_instId = st.selectbox(
+        "Select Instrument", 
+        all_instruments, 
+        index=all_instruments.index("SOL-USDT-SWAP") if "SOL-USDT-SWAP" in all_instruments else 0,
+        help="Choose the trading instrument (e.g., BTC-USDT-SWAP)."
+    )
 
 with col2:
-    bar = st.selectbox("Timeframe", ["5m","15m","1H","6H","12H"], index=2)
+    bar = st.selectbox(
+        "Timeframe", 
+        ["5m","15m","1H","6H","12H"], 
+        index=2,
+        help="Select the timeframe for analysis."
+    )
 
+# Use the sidebar for actions
 st.sidebar.markdown("### 🚀 Actions")
 
 def run_analysis_clicked():
     st.session_state.run_analysis = True
     st.session_state.analysis_results = compute_confidence(st.session_state.selected_instId, bar)
-    st.cache_data.clear() # Clear cache to fetch new data
+    st.cache_data.clear()
 
-st.sidebar.button("Run Analysis", on_click=run_analysis_clicked)
+if st.sidebar.button("Get Analysis"):
+    run_analysis_clicked()
 
 # Display results if available
 if st.session_state.analysis_results:
     result = st.session_state.analysis_results
     
-    st.markdown(f"**_Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_**")
-    
+    st.markdown(f"**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     st.markdown("---")
+    
     main_col1, main_col2, main_col3 = st.columns(3)
     
     with main_col1:
-        st.metric(label=f"{result['label']} Confidence", value=f"{result['confidence_pct']}%")
+        st.metric(label=f"Confidence", value=f"{result['confidence_pct']}%", delta=result['label'])
     
     with main_col2:
         st.metric(label="Recommendation", value=f"{result['recommendation']} ({result['strength']})")
@@ -427,4 +438,4 @@ if st.session_state.analysis_results:
         st.json(result["raw"])
 
 else:
-    st.info("Select instrument/timeframe from the top and press 'Run Analysis' in the sidebar to begin.")
+    st.info("Select instrument/timeframe from the top and press 'Get Analysis' in the sidebar to begin.")
