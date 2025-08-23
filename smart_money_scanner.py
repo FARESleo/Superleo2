@@ -102,6 +102,38 @@ st.markdown(
         background-color: #fff8f0;
         color: #e65100;
     }
+    .metrics-container {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+    }
+    .metric-card {
+        flex: 1;
+        background-color: #f8f8f8;
+        border-radius: 8px;
+        padding: 15px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+    .metric-label {
+        font-size: 14px;
+        color: #666;
+        font-weight: bold;
+        white-space: nowrap;
+    }
+    .metric-value {
+        font-size: 24px;
+        font-weight: bold;
+        margin-top: 5px;
+    }
+    .metric-delta {
+        font-size: 12px;
+        color: #999;
+    }
+    .metric-contrib {
+        font-size: 12px;
+        color: #999;
+    }
     </style>
     """,
     unsafe_allow_html=True
@@ -510,96 +542,6 @@ st.session_state.bar = st.selectbox("Timeframe", ["5m", "15m", "1H", "6H", "12H"
 if st.session_state.analysis_results:
     result = st.session_state.analysis_results
     
-    # Custom CSS for the cards and progress bar
-    st.markdown("""
-        <style>
-        .custom-card {
-            background-color: #F8F8F8;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 15px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            color: #333;
-        }
-        .card-header {
-            font-size: 14px;
-            color: #777;
-            text-transform: uppercase;
-            font-weight: bold;
-        }
-        .card-value {
-            font-size: 28px;
-            font-weight: bold;
-            margin-top: 5px;
-        }
-        .progress-bar-container {
-            background-color: #ddd;
-            border-radius: 50px;
-            height: 10px;
-            width: 100%;
-            margin-top: 10px;
-        }
-        .progress-bar {
-            height: 100%;
-            border-radius: 50px;
-            transition: width 0.5s ease-in-out;
-        }
-        .trade-plan-card {
-            background-color: #f0f0f0;
-            border-left: 5px solid #6A11CB;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 15px;
-        }
-        .trade-plan-title {
-            font-size: 24px;
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 15px;
-        }
-        .trade-plan-metric {
-            margin-bottom: 15px;
-        }
-        .trade-plan-metric-label {
-            font-size: 16px;
-            color: #555;
-            font-weight: bold;
-        }
-        .trade-plan-metric-value {
-            font-size: 20px;
-            font-weight: bold;
-        }
-        .reason-card {
-            background-color: #f0f4f7;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 10px;
-            border-left: 4px solid;
-        }
-        .reason-text {
-            font-size: 16px;
-            line-height: 1.6;
-            margin-top: 5px;
-            font-style: italic;
-        }
-        .reason-card.bullish {
-            border-color: #4CAF50;
-            background-color: #f0fbf0;
-            color: #2e7d32;
-        }
-        .reason-card.bearish {
-            border-color: #d32f2f;
-            background-color: #fff0f0;
-            color: #b71c1c;
-        }
-        .reason-card.neutral {
-            border-color: #ff9800;
-            background-color: #fff8f0;
-            color: #e65100;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-    
     # Get the confidence color based on the percentage
     def get_confidence_color(pct):
         if pct <= 40: return "red"
@@ -703,8 +645,6 @@ if st.session_state.analysis_results:
     st.markdown("---")
     st.markdown("### 📊 المقاييس الأساسية")
     
-    # ***هذا هو الكود المحدث لحل المشكلة***
-    
     metrics_data = {
         "funding": {"label": "التمويل", "value": result["metrics"]["funding"], "weight": result["weights"]["funding"]},
         "oi": {"label": "OI", "value": result["metrics"]["oi"], "weight": result["weights"]["oi"]},
@@ -712,22 +652,27 @@ if st.session_state.analysis_results:
         "orderbook": {"label": "دفتر الطلبات", "value": result["metrics"]["orderbook"], "weight": result["weights"]["orderbook"]},
         "backtest": {"label": "الاختبار الخلفي", "value": result["metrics"]["backtest"], "weight": result["weights"]["backtest"]}
     }
-
+    
     icons = {"funding":"💰","oi":"📊","cvd":"📈","orderbook":"⚖️","backtest":"🧪"}
     
-    # هنا تم إضافة حلقة التكرار لإنشاء الأعمدة والمقاييس داخلها
-    cols = st.columns(len(metrics_data))
-
-    for idx, k in enumerate(metrics_data):
-        with cols[idx]:
-            score = metrics_data[k]["value"]
-            weight = metrics_data[k]["weight"]
-            contrib = round(score * weight * 100, 2)
-            
-            # هنا يتم عرض المقياس بشكل صحيح داخل كل عمود
-            st.metric(label=f"{icons[k]} {metrics_data[k]['label']}", value=f"{score:.3f}", delta=f"w={weight}")
-            st.caption(f"Contribution: {contrib}%")
-
+    # ***هذا هو الكود الجديد والمحسن الذي يستخدم HTML/CSS***
+    html_content = '<div class="metrics-container">'
+    for k in metrics_data:
+        score = metrics_data[k]["value"]
+        weight = metrics_data[k]["weight"]
+        contrib = round(score * weight * 100, 2)
+        
+        html_content += f"""
+            <div class="metric-card">
+                <div class="metric-label">{icons[k]} {metrics_data[k]['label']}</div>
+                <div class="metric-value">{score:.3f}</div>
+                <div class="metric-delta">w={weight}</div>
+                <div class="metric-contrib">Contribution: {contrib}%</div>
+            </div>
+        """
+    html_content += '</div>'
+    
+    st.markdown(html_content, unsafe_allow_html=True)
 
     st.markdown("---")
     st.markdown("### 🔍 تحليل إضافي")
