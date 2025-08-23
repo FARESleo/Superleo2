@@ -504,7 +504,10 @@ if st.session_state.analysis_results:
 
     with main_col3:
         st.markdown(f"<div class='stMetric'>", unsafe_allow_html=True)
-        st.metric(label="Live Price", value=f"{result['raw']['price']:, .4f}" if result['raw']['price'] else "N/A")
+        # SCRIPT FIX: Ensure value is not None or NaN before formatting
+        val = result['raw']['price']
+        formatted_val = f"{val:,.4f}" if val is not None and not isnan(val) else "N/A"
+        st.metric(label="Live Price", value=formatted_val)
         st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("---")
@@ -524,13 +527,19 @@ if st.session_state.analysis_results:
     st.markdown("### 📝 Trade Plan")
     st.markdown(f"**Reason:** {result['reason']}")
     trade_col1, trade_col2, trade_col3 = st.columns(3)
+    # SCRIPT FIX: Ensure values are not None or NaN before formatting
     trade_col1.metric("Entry Price", f"{result['entry']:,.4f}" if result['entry'] is not None and not isnan(result['entry']) else "N/A")
     trade_col2.metric("Target Price", f"{result['target']:,.4f}" if result['target'] is not None and not isnan(result['target']) else "N/A")
     trade_col3.metric("Stop Loss", f"{result['stop']:,.4f}" if result['stop'] is not None and not isnan(result['stop']) else "N/A")
 
     st.markdown("---")
     st.markdown("### 🔍 Additional Analysis")
-    st.markdown(f"• **Support:** {result['raw']['support']:,.4f} | **Resistance:** {result['raw']['resistance']:,.4f}")
+    # SCRIPT FIX: Ensure values are not None or NaN before formatting
+    support_val = result['raw']['support']
+    resistance_val = result['raw']['resistance']
+    formatted_support = f"{support_val:,.4f}" if support_val is not None and not isnan(support_val) else "N/A"
+    formatted_resistance = f"{resistance_val:,.4f}" if resistance_val is not None and not isnan(resistance_val) else "N/A"
+    st.markdown(f"• **Support:** {formatted_support} | **Resistance:** {formatted_resistance}")
     st.markdown(f"• **Candle Signal:** {result['raw']['candle_signal'] if result['raw']['candle_signal'] else 'None'}")
     
     show_raw = st.checkbox("Show Raw metrics", value=False)
