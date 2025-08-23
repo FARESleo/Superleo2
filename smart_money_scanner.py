@@ -501,7 +501,6 @@ with header_col2:
         
 def toggle_calculator():
     st.session_state.show_calculator = not st.session_state.show_calculator
-    st.experimental_rerun()
 
 with header_col3:
     st.markdown("""
@@ -954,7 +953,6 @@ calculator_html = """
         display: flex;
         align-items: center;
         justify-content: center;
-        z-index: 10001;
     }
     /* Mobile Responsiveness */
     @media (max-width: 600px) {
@@ -1151,6 +1149,5 @@ calculator_html = """
 if st.session_state.show_calculator:
     # Use a container to hold the popup UI elements
     with st.container():
-        # This button is now responsible for closing the popup
         st.button("❌", on_click=lambda: st.session_state.update(show_calculator=False), key="close_calc_btn")
         st.components.v1.html(calculator_html, height=700, scrolling=True)
