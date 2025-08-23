@@ -341,60 +341,45 @@ def compute_confidence(instId, bar="1H"):
 # ----------------------------
 st.set_page_config(page_title="Smart Money Scanner", layout="wide")
 
-# Initialize session state for analysis results and selected instrument
+# Initialize session state
 if 'analysis_results' not in st.session_state:
     st.session_state.analysis_results = None
 if 'selected_instId' not in st.session_state:
-    st.session_state.selected_instId = ""
-if 'run_analysis' not in st.session_state:
-    st.session_state.run_analysis = False
+    st.session_state.selected_instId = "BTC-USDT-SWAP"
+if 'bar' not in st.session_state:
+    st.session_state.bar = "1H"
 
 # Fetch all instruments once
 all_instruments = fetch_instruments("SWAP") + fetch_instruments("SPOT")
 if not all_instruments:
     st.error("Unable to load instruments from OKX.")
     st.stop()
-
-# Use a single, clean header for the main title
-st.header("🧠 Smart Money Scanner")
-
-# Create two columns for controls at the top
-col1, col2 = st.columns(2)
-
-with col1:
-    st.session_state.selected_instId = st.selectbox(
-        "Select Instrument", 
-        all_instruments, 
-        index=all_instruments.index("SOL-USDT-SWAP") if "SOL-USDT-SWAP" in all_instruments else 0,
-        help="Choose the trading instrument (e.g., BTC-USDT-SWAP)."
-    )
-
-with col2:
-    bar = st.selectbox(
-        "Timeframe", 
-        ["5m","15m","1H","6H","12H"], 
-        index=2,
-        help="Select the timeframe for analysis."
-    )
-
-# Use the sidebar for actions
-st.sidebar.markdown("### 🚀 Actions")
+    
+# Title and Button in the same row
+header_col1, header_col2 = st.columns([0.7, 0.3])
+with header_col1:
+    st.header("🧠 Smart Money Scanner")
 
 def run_analysis_clicked():
-    st.session_state.run_analysis = True
-    st.session_state.analysis_results = compute_confidence(st.session_state.selected_instId, bar)
-    st.cache_data.clear()
+    st.session_state.analysis_results = compute_confidence(st.session_state.selected_instId, st.session_state.bar)
 
-if st.sidebar.button("Get Analysis"):
-    run_analysis_clicked()
+with header_col2:
+    if st.button("Get Analysis"):
+        run_analysis_clicked()
+        
+# Display last updated time
+st.markdown(f"**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+st.markdown("---")
+
+# User inputs
+st.session_state.selected_instId = st.selectbox("Select Instrument", all_instruments, index=all_instruments.index(st.session_state.selected_instId) if st.session_state.selected_instId in all_instruments else 0)
+st.session_state.bar = st.selectbox("Timeframe", ["5m", "15m", "1H", "6H", "12H"], index=["5m", "15m", "1H", "6H", "12H"].index(st.session_state.bar) if st.session_state.bar in ["5m", "15m", "1H", "6H", "12H"] else 2)
 
 # Display results if available
 if st.session_state.analysis_results:
     result = st.session_state.analysis_results
     
-    st.markdown(f"**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     st.markdown("---")
-    
     main_col1, main_col2, main_col3 = st.columns(3)
     
     with main_col1:
@@ -432,10 +417,10 @@ if st.session_state.analysis_results:
     st.markdown(f"• **Support:** {result['raw']['support']:,} | **Resistance:** {result['raw']['resistance']:,}")
     st.markdown(f"• **Candle Signal:** {result['raw']['candle_signal'] if result['raw']['candle_signal'] else 'None'}")
     
-    show_raw = st.sidebar.checkbox("Show Raw metrics", value=False)
+    show_raw = st.checkbox("Show Raw metrics", value=False)
     if show_raw:
         st.markdown("### Raw metrics (for transparency)")
         st.json(result["raw"])
 
 else:
-    st.info("Select instrument/timeframe from the top and press 'Get Analysis' in the sidebar to begin.")
+    st.info("Select instrument/timeframe and press 'Get Analysis' to begin.")
