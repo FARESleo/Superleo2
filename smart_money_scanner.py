@@ -379,17 +379,90 @@ st.session_state.bar = st.selectbox("Timeframe", ["5m", "15m", "1H", "6H", "12H"
 if st.session_state.analysis_results:
     result = st.session_state.analysis_results
     
-    st.markdown("---")
-    main_col1, main_col2, main_col3 = st.columns(3)
+    # Custom CSS for the cards and progress bar
+    st.markdown("""
+        <style>
+        .custom-card {
+            background-color: #F8F8F8;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            color: #333;
+        }
+        .card-header {
+            font-size: 14px;
+            color: #777;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+        .card-value {
+            font-size: 28px;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        .progress-bar-container {
+            background-color: #ddd;
+            border-radius: 50px;
+            height: 10px;
+            width: 100%;
+            margin-top: 10px;
+        }
+        .progress-bar {
+            height: 100%;
+            border-radius: 50px;
+            transition: width 0.5s ease-in-out;
+        }
+        </style>
+    """, unsafe_allow_html=True)
     
-    with main_col1:
-        st.metric(label=f"Confidence", value=f"{result['confidence_pct']}%", delta=result['label'])
-    
-    with main_col2:
-        st.metric(label="Recommendation", value=f"{result['recommendation']} ({result['strength']})")
+    # Get the confidence color based on the percentage
+    def get_confidence_color(pct):
+        if pct <= 40: return "red"
+        if pct <= 60: return "orange"
+        return "green"
 
-    with main_col3:
-        st.metric(label="Live Price", value=f"{result['raw']['price']:,}" if result['raw']['price'] else "N/A")
+    confidence_color = get_confidence_color(result['confidence_pct'])
+    progress_width = result['confidence_pct']
+    
+    # Visual alert system
+    if result['confidence_pct'] >= 80:
+        st.balloons()
+        st.success("🎉 إشارة قوية جدًا تم اكتشافها! انتبه لهذه الفرصة.", icon="🔥")
+    elif result['confidence_pct'] <= 20:
+        st.warning("⚠️ إشارة ضعيفة جدًا. يفضل توخي الحذر.")
+        
+    # Display the main metrics in cards
+    cols = st.columns(3)
+    
+    with cols[0]:
+        st.markdown(f"""
+            <div class="custom-card">
+                <div class="card-header">📊 الثقة</div>
+                <div class="card-value">{result['confidence_pct']}%</div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" style="width:{progress_width}%; background-color:{confidence_color};"></div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    with cols[1]:
+        st.markdown(f"""
+            <div class="custom-card">
+                <div class="card-header">⭐ التوصية</div>
+                <div class="card-value">{result['recommendation']}</div>
+                <div style="font-size: 14px; color: #999;">({result['strength']})</div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+    with cols[2]:
+        st.markdown(f"""
+            <div class="custom-card">
+                <div class="card-header">📈 السعر الحالي</div>
+                <div class="card-value">{result['raw']['price']:,}</div>
+                <div style="font-size: 14px; color: #999;">{st.session_state.selected_instId}</div>
+            </div>
+        """, unsafe_allow_html=True)
 
     st.markdown("---")
 
