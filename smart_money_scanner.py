@@ -9,7 +9,7 @@ from datetime import datetime
 OKX_BASE = "https://www.okx.com"
 
 # ----------------------------
-# CSS Styling for improved readability
+# CSS Styling for a modern and readable look
 # ----------------------------
 st.markdown("""
 <style>
@@ -19,6 +19,8 @@ st.markdown("""
     padding-bottom: 5rem;
     padding-left: 1rem;
     padding-right: 1rem;
+    background-color: #121212; /* Darker, more technical background */
+    color: #FFFFFF; /* White text for maximum contrast */
 }
 
 /* Hide Streamlit's default hamburger menu */
@@ -36,46 +38,58 @@ st.markdown("""
     border-radius: 10px;
     padding: 20px;
     margin-bottom: 20px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    border: 1px solid #333333;
 }
 
 /* Metrics styling */
 .stMetric {
-    background-color: #222222; /* Darker background for better contrast */
+    background-color: #222222;
     border-radius: 8px;
     padding: 10px;
     text-align: center;
-    border: 1px solid #444444; /* Lighter border for separation */
-    transition: transform 0.2s ease-in-out;
+    border: 1px solid #333333;
+    transition: transform 0.2s ease-in-out, border-color 0.2s ease-in-out;
 }
 .stMetric:hover {
     transform: translateY(-3px);
-    border: 1px solid #666; /* Hover effect */
+    border: 1px solid #00FFFF; /* Glow effect on hover */
+}
+.stMetric .st-bd .st-b5 {
+    color: #FFFFFF !important; /* Make metric value white for visibility */
+    font-size: 2em;
+    font-weight: 700;
+}
+.stMetric .st-bd .st-at {
+    color: #d3d3d3 !important; /* Lighter gray for label */
 }
 
 /* Color coding for metrics */
 .stMetric.bullish {
-    border-left: 4px solid #4CAF50; /* Green border */
+    border-left: 5px solid #7CFC00; /* Neon green border */
 }
 .stMetric.bearish {
-    border-left: 4px solid #f44336; /* Red border */
+    border-left: 5px solid #FF69B4; /* Neon pink/red border */
 }
 .stMetric.neutral {
-    border-left: 4px solid #666; /* Gray border */
+    border-left: 5px solid #00FFFF; /* Cyan border for neutrality */
 }
 
-/* Font and text color - Increased brightness */
+/* Font and text color - Made bright white for max readability */
 html, body {
-    color: #f0f0f0 !important; /* Brighter font color */
+    color: #FFFFFF !important;
     font-family: 'Segoe UI', 'Roboto', sans-serif;
 }
 .st-emotion-cache-12oz5g7, .st-emotion-cache-1r651o3 {
-    color: #f0f0f0 !important;
+    color: #FFFFFF !important;
 }
 
 /* Headings */
 h1, h2, h3, h4, h5, h6 {
-    color: #ffffff; /* Pure white for headings */
+    color: #FFFFFF;
+    border-bottom: 2px solid #00FFFF; /* Underline headings with a techy color */
+    padding-bottom: 5px;
+    margin-bottom: 15px;
 }
 
 /* Buttons */
@@ -86,9 +100,21 @@ h1, h2, h3, h4, h5, h6 {
     border-radius: 8px;
     border: none;
     padding: 10px 20px;
+    transition: background-color 0.2s ease-in-out;
 }
 .stButton>button:hover {
     background-color: #0a58ca;
+}
+
+/* Special styles for main headers */
+.st-emotion-cache-1d374r {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.st-emotion-cache-1d374r h1 {
+    border-bottom: none;
+    margin-bottom: 0;
 }
 </style>
 """, unsafe_allow_html=True)
