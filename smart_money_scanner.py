@@ -9,7 +9,7 @@ from datetime import datetime
 OKX_BASE = "https://www.okx.com"
 
 # ----------------------------
-# CSS Styling for a modern look
+# CSS Styling for improved readability
 # ----------------------------
 st.markdown("""
 <style>
@@ -41,15 +41,16 @@ st.markdown("""
 
 /* Metrics styling */
 .stMetric {
-    background-color: #2a2a2a;
+    background-color: #222222; /* Darker background for better contrast */
     border-radius: 8px;
     padding: 10px;
     text-align: center;
-    border: 1px solid #333;
+    border: 1px solid #444444; /* Lighter border for separation */
     transition: transform 0.2s ease-in-out;
 }
 .stMetric:hover {
     transform: translateY(-3px);
+    border: 1px solid #666; /* Hover effect */
 }
 
 /* Color coding for metrics */
@@ -63,21 +64,18 @@ st.markdown("""
     border-left: 4px solid #666; /* Gray border */
 }
 
-/* Font and text color */
-html body {
-    color: #e0e0e0;
+/* Font and text color - Increased brightness */
+html, body {
+    color: #f0f0f0 !important; /* Brighter font color */
     font-family: 'Segoe UI', 'Roboto', sans-serif;
 }
-.st-emotion-cache-12oz5g7 {
-    color: #e0e0e0;
-}
-.st-emotion-cache-1r651o3 {
-    color: #e0e0e0;
+.st-emotion-cache-12oz5g7, .st-emotion-cache-1r651o3 {
+    color: #f0f0f0 !important;
 }
 
 /* Headings */
 h1, h2, h3, h4, h5, h6 {
-    color: #f0f0f0;
+    color: #ffffff; /* Pure white for headings */
 }
 
 /* Buttons */
@@ -94,22 +92,6 @@ h1, h2, h3, h4, h5, h6 {
 }
 </style>
 """, unsafe_allow_html=True)
-
-# ----------------------------
-# HTTP helper with retries
-# ----------------------------
-@st.cache_data(ttl=600)
-def okx_get(path, params=None, retries=3, delay=0.6):
-    url = f"{OKX_BASE}{path}"
-    for i in range(retries):
-        try:
-            r = requests.get(url, params=params, timeout=10)
-            if r.status_code == 200:
-                return r.json()
-        except Exception:
-            pass
-        time.sleep(delay * (i + 1))
-    return None
 
 # ----------------------------
 # Data fetchers (cached)
@@ -469,12 +451,12 @@ with col2:
         ["5m", "15m", "1H", "6H", "12H"],
         index=["5m", "15m", "1H", "6H", "12H"].index(st.session_state.bar) if st.session_state.bar in ["5m", "15m", "1H", "6H", "12H"] else 2
     )
+st.markdown(f"**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 # Display results if available
 if st.session_state.analysis_results:
     result = st.session_state.analysis_results
     
-    st.markdown(f"**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     st.markdown("---")
 
     # Main metrics with color coding
