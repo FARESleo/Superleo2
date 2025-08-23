@@ -703,6 +703,8 @@ if st.session_state.analysis_results:
     st.markdown("---")
     st.markdown("### 📊 Core Metrics")
     icons = {"funding":"💰","oi":"📊","cvd":"📈","orderbook":"⚖️","backtest":"🧪"}
+    
+    # هذا هو الكود الذي تم تعديله ليناسب تنسيق البطاقات بشكل صحيح
     cols = st.columns(5)
     for idx, k in enumerate(["funding","oi","cvd","orderbook","backtest"]):
         col = cols[idx]
