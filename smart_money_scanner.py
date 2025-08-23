@@ -101,10 +101,48 @@ st.markdown(
         background-color: #fff8f0;
         color: #e65100;
     }
+
+    /* --- كود CSS الجديد لتثبيت الشريط العلوي وتصميم الأزرار --- */
+    .fixed-header-container {
+        position: sticky;
+        top: 0;
+        z-index: 1000; /* يضمن بقاءه فوق العناصر الأخرى */
+        background: rgba(255, 255, 255, 0.9); /* خلفية شبه شفافة */
+        padding: 10px 0;
+        border-bottom: 1px solid #eee;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .st-emotion-cache-1r6y4y1 {
+        background-color: transparent !important;
+    }
+    div.stButton > button {
+        background-image: linear-gradient(to right, #6A11CB, #2575FC);
+        color: white;
+        padding: 12px 30px;
+        font-size: 16px;
+        font-weight: bold;
+        border-radius: 8px;
+        border: none;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        width: 100%;
+        cursor: pointer;
+    }
+    div.stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
+    }
+    div.stButton > button#calc_button {
+        background-image: linear-gradient(to right, #FFA17F, #FF4B2B);
+    }
+    div.stButton > button#tracker_button {
+        background-image: linear-gradient(to right, #11c062, #07712d);
+    }
     </style>
     """,
     unsafe_allow_html=True
 )
+
 
 OKX_BASE = "https://www.okx.com"
 
@@ -471,96 +509,41 @@ if not all_instruments:
     st.error("Unable to load instruments from OKX.")
     st.stop()
     
-# Title and Buttons
-header_col1, header_col2, header_col3, header_col4 = st.columns([0.5, 0.2, 0.15, 0.15])
-with header_col1:
-    st.header("🧠 Smart Money Scanner")
+# --- شريط علوي ثابت مع الأزرار ---
+with st.container():
+    st.markdown('<div class="fixed-header-container">', unsafe_allow_html=True)
+    header_col1, header_col2, header_col3, header_col4 = st.columns([0.5, 0.2, 0.15, 0.15])
+    
+    with header_col1:
+        st.header("🧠 Smart Money Scanner")
 
-def run_analysis_clicked():
-    st.session_state.analysis_results = compute_confidence(st.session_state.selected_instId, st.session_state.bar)
+    def run_analysis_clicked():
+        st.session_state.analysis_results = compute_confidence(st.session_state.selected_instId, st.session_state.bar)
 
-with header_col2:
-    st.markdown("""
-        <style>
-        div.stButton > button {
-            background-image: linear-gradient(to right, #6A11CB, #2575FC);
-            color: white;
-            padding: 12px 30px;
-            font-size: 16px;
-            font-weight: bold;
-            border-radius: 8px;
-            border: none;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-            width: 100%;
-        }
-        div.stButton > button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
-        }
-        </style>
-    """, unsafe_allow_html=True)
-    if st.button("Go"):
-        run_analysis_clicked()
-        
-def toggle_calculator():
-    st.session_state.show_calculator = not st.session_state.show_calculator
-    st.session_state.selected_leverage = None # Reset leverage when opening/closing
+    with header_col2:
+        if st.button("Go"):
+            run_analysis_clicked()
+            
+    def toggle_calculator():
+        st.session_state.show_calculator = not st.session_state.show_calculator
+        st.session_state.selected_leverage = None # Reset leverage when opening/closing
 
-with header_col3:
-    st.markdown("""
-        <style>
-        div.stButton > button#calc_button {
-            background-image: linear-gradient(to right, #FFA17F, #FF4B2B);
-            color: white;
-            padding: 12px 30px;
-            font-size: 16px;
-            font-weight: bold;
-            border-radius: 8px;
-            border: none;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-            width: 100%;
-        }
-        div.stButton > button#calc_button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
-        }
-        </style>
-    """, unsafe_allow_html=True)
-    st.button("Calculator", on_click=toggle_calculator, key="calc_button")
+    with header_col3:
+        st.button("Calculator", on_click=toggle_calculator, key="calc_button")
 
-def toggle_tracker():
-    st.session_state.show_tracker = not st.session_state.show_tracker
+    def toggle_tracker():
+        st.session_state.show_tracker = not st.session_state.show_tracker
 
-with header_col4:
-    st.markdown("""
-        <style>
-        div.stButton > button#tracker_button {
-            background-image: linear-gradient(to right, #11c062, #07712d);
-            color: white;
-            padding: 12px 30px;
-            font-size: 16px;
-            font-weight: bold;
-            border-radius: 8px;
-            border: none;
-            box-shadow: 4px 6px rgba(0, 0, 0, 0.2);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-            width: 100%;
-        }
-        div.stButton > button#tracker_button:hover {
-            transform: translateY(-2px);
-            box-shadow: 6px 10px rgba(0, 0, 0, 0.3);
-        }
-        </style>
-    """, unsafe_allow_html=True)
-    st.button("Tracker", on_click=toggle_tracker, key="tracker_button")
-        
-# Display last updated time
+    with header_col4:
+        st.button("Tracker", on_click=toggle_tracker, key="tracker_button")
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+# Display last updated time and user inputs
 st.markdown(f"**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 st.markdown("---")
 
-# User inputs
 st.session_state.selected_instId = st.selectbox("Select Instrument", all_instruments, index=all_instruments.index(st.session_state.selected_instId) if st.session_state.selected_instId in all_instruments else 0)
 st.session_state.bar = st.selectbox("Timeframe", ["30m", "15m", "1H", "6H", "12H"], index=["30m", "15m", "1H", "6H", "12H"].index(st.session_state.bar) if st.session_state.bar in ["30m", "15m", "1H", "6H", "12H"] else 0)
 
@@ -568,95 +551,6 @@ st.session_state.bar = st.selectbox("Timeframe", ["30m", "15m", "1H", "6H", "12H
 # Display results if available
 if st.session_state.analysis_results:
     result = st.session_state.analysis_results
-    
-    st.markdown("""
-        <style>
-        .custom-card {
-            background-color: #F8F8F8;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 15px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            color: #333;
-        }
-        .card-header {
-            font-size: 14px;
-            color: #777;
-            text-transform: uppercase;
-            font-weight: bold;
-        }
-        .card-value {
-            font-size: 28px;
-            font-weight: bold;
-            margin-top: 5px;
-        }
-        .progress-bar-container {
-            background-color: #ddd;
-            border-radius: 50px;
-            height: 10px;
-            width: 100%;
-            margin-top: 10px;
-        }
-        .progress-bar {
-            height: 100%;
-            border-radius: 50px;
-            transition: width 0.5s ease-in-out;
-        }
-        .trade-plan-card {
-            background-color: #f0f0f0;
-            border-left: 5px solid #6A11CB;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 15px;
-        }
-        .trade-plan-title {
-            font-size: 24px;
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 15px;
-        }
-        .trade-plan-metric {
-            margin-bottom: 15px;
-        }
-        .trade-plan-metric-label {
-            font-size: 16px;
-            color: #555;
-            font-weight: bold;
-        }
-        .trade-plan-metric-value {
-            font-size: 20px;
-            font-weight: bold;
-        }
-        .reason-card {
-            background-color: #f0f4f7;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 10px;
-            border-left: 4px solid;
-        }
-        .reason-text {
-            font-size: 16px;
-            line-height: 1.6;
-            margin-top: 5px;
-            font-style: italic;
-        }
-        .reason-card.bullish {
-            border-color: #4CAF50;
-            background-color: #f0fbf0;
-            color: #2e7d32;
-        }
-        .reason-card.bearish {
-            border-color: #d32f2f;
-            background-color: #fff0f0;
-            color: #b71c1c;
-        }
-        .reason-card.neutral {
-            border-color: #ff9800;
-            background-color: #fff8f0;
-            color: #e65100;
-        }
-        </style>
-    """, unsafe_allow_html=True)
     
     # Get the confidence color based on the percentage
     def get_confidence_color(pct):
