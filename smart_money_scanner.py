@@ -536,9 +536,8 @@ st.markdown("---")
 
 # User inputs
 st.session_state.selected_instId = st.selectbox("Select Instrument", all_instruments, index=all_instruments.index(st.session_state.selected_instId) if st.session_state.selected_instId in all_instruments else 0)
-
-# --- تم تعديل هذا السطر ---
 st.session_state.bar = st.selectbox("Timeframe", ["30m", "15m", "1H", "6H", "12H"], index=["30m", "15m", "1H", "6H", "12H"].index(st.session_state.bar) if st.session_state.bar in ["30m", "15m", "1H", "6H", "12H"] else 0)
+
 
 # Display results if available
 if st.session_state.analysis_results:
