@@ -17,7 +17,7 @@ st.markdown(
         background-position: center;
         background-attachment: fixed;
     }
-
+    
     /* الشريط الثابت في الأسفل */
     .bottom-nav {
         position: fixed;
@@ -32,7 +32,7 @@ st.markdown(
         box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
         z-index: 1000;
     }
-
+    
     /* شكل الأزرار */
     .nav-btn {
         background-color: transparent;
@@ -47,8 +47,9 @@ st.markdown(
         flex-direction: column;
         align-items: center;
         text-decoration: none;
+        
     }
-
+    
     .nav-btn .icon {
         font-size: 24px;
         margin-bottom: 5px;
@@ -61,8 +62,8 @@ st.markdown(
     .nav-btn:hover {
         color: #6A11CB;
     }
-
-    /* إخفاء الأزرار الافتراضية لـ Streamlit */
+    
+    /* إخفاء أزرار Streamlit الافتراضية */
     div.stButton > button {
         display: none;
     }
@@ -534,8 +535,7 @@ if st.session_state.page == 'main_scanner':
     st.markdown("<br>", unsafe_allow_html=True)
     
     # Run analysis button
-    if st.button("Run Analysis"):
-        st.session_state.analysis_results = compute_confidence(st.session_state.selected_instId, st.session_state.bar)
+    st.button("Run Analysis", on_click=lambda: st.session_state.update(analysis_results=compute_confidence(st.session_state.selected_instId, st.session_state.bar)))
         
     # Display results
     if st.session_state.analysis_results:
@@ -610,22 +610,28 @@ elif st.session_state.page == 'tracker':
     st.info("Here you can build your trade tracker.")
     
 # --- شريط التنقل الثابت في الأسفل ---
-st.markdown(
-    f"""
-    <div class="bottom-nav">
-        <a href="?page=main_scanner" class="nav-btn {'active' if st.session_state.page == 'main_scanner' else ''}">
-            <i class="fas fa-brain icon"></i>
-            <span>Scanner</span>
-        </a>
-        <a href="?page=calculator" class="nav-btn {'active' if st.session_state.page == 'calculator' else ''}">
-            <i class="fas fa-calculator icon"></i>
-            <span>Calculator</span>
-        </a>
-        <a href="?page=tracker" class="nav-btn {'active' if st.session_state.page == 'tracker' else ''}">
-            <i class="fas fa-chart-line icon"></i>
-            <span>Tracker</span>
-        </a>
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.markdown(f"""
+    <div class="nav-btn {'active' if st.session_state.page == 'main_scanner' else ''}">
+        <i class="fas fa-brain icon"></i>
+        <span>Scanner</span>
     </div>
-    """,
-    unsafe_allow_html=True
-)
+    """, unsafe_allow_html=True)
+    st.button("Scanner", key="btn_scanner", on_click=lambda: st.session_state.update(page='main_scanner'))
+with col2:
+    st.markdown(f"""
+    <div class="nav-btn {'active' if st.session_state.page == 'calculator' else ''}">
+        <i class="fas fa-calculator icon"></i>
+        <span>Calculator</span>
+    </div>
+    """, unsafe_allow_html=True)
+    st.button("Calculator", key="btn_calculator", on_click=lambda: st.session_state.update(page='calculator'))
+with col3:
+    st.markdown(f"""
+    <div class="nav-btn {'active' if st.session_state.page == 'tracker' else ''}">
+        <i class="fas fa-chart-line icon"></i>
+        <span>Tracker</span>
+    </div>
+    """, unsafe_allow_html=True)
+    st.button("Tracker", key="btn_tracker", on_click=lambda: st.session_state.update(page='tracker'))
