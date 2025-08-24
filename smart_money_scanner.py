@@ -6,7 +6,7 @@ import time
 from math import isnan
 from datetime import datetime
 
-# --- CSS للتصميم الاحترافي والأزرار الجديدة ---
+# --- كود CSS للتصميم الاحترافي والأزرار الجديدة ---
 st.markdown(
     """
     <style>
@@ -32,7 +32,9 @@ st.markdown(
         box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
         z-index: 1000;
     }
-    .st-emotion-cache-1pxx35k.e1f1d6gn2 { /* هذه الفئة تستهدف الأزرار في الأعمدة */
+    
+    /* أنماط الأزرار الدائرية الجديدة */
+    .st-emotion-cache-1pxx35k.e1f1d6gn2 {
         display: flex !important;
         flex-direction: column;
         align-items: center;
@@ -42,12 +44,41 @@ st.markdown(
         padding: 0;
         margin: 0;
     }
-
-    .st-emotion-cache-1pxx35k.e1f1d6gn2:hover {
-        color: #6A11CB;
+    .st-emotion-cache-1pxx35k.e1f1d6gn2 button {
+        background: linear-gradient(to right, #6A11CB, #2575FC);
+        color: white;
+        width: 55px;  /* عرض ثابت */
+        height: 55px; /* ارتفاع ثابت */
+        border-radius: 50%; /* لجعلها دائرية */
+        border: none;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.2s ease;
     }
-    
-    .st-emotion-cache-1pxx35k.e1f1d6gn2[data-active=true] {
+    .st-emotion-cache-1pxx35k.e1f1d6gn2 button:hover {
+        transform: scale(1.05);
+        box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
+    }
+    /* إخفاء نص الزر */
+    .st-emotion-cache-1pxx35k.e1f1d6gn2 button span {
+        display: none;
+    }
+    /* الأيقونات */
+    .st-emotion-cache-1pxx35k.e1f1d6gn2 button:before {
+        font-family: 'Font Awesome 6 Free';
+        font-weight: 900;
+        font-size: 24px;
+        color: white;
+    }
+    /* أنماط النص تحت الأزرار */
+    .st-emotion-cache-1pxx35k.e1f1d6gn2 span {
+        font-size: 14px;
+        color: white;
+        margin-top: 5px;
+    }
+    .st-emotion-cache-1pxx35k.e1f1d6gn2:hover span {
         color: #6A11CB;
     }
 
@@ -517,9 +548,6 @@ if st.session_state.page == 'main_scanner':
     st.session_state.bar = st.selectbox("Timeframe", ["30m", "15m", "1H", "6H", "12H"], index=["30m", "15m", "1H", "6H", "12H"].index(st.session_state.bar) if st.session_state.bar in ["30m", "15m", "1H", "6H", "12H"] else 0)
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Run analysis button
-    st.button("Run Analysis", on_click=lambda: st.session_state.update(analysis_results=compute_confidence(st.session_state.selected_instId, st.session_state.bar)))
-        
     # Display results
     if st.session_state.analysis_results:
         result = st.session_state.analysis_results
@@ -569,67 +597,4 @@ if st.session_state.page == 'main_scanner':
             )
         
         # Reason Card
-        reason_class = "bullish" if result["recommendation"] == "LONG" else ("bearish" if result["recommendation"] == "SHORT" else "neutral")
-        st.markdown(f"""
-        <div class="reason-card {reason_class}">
-            <div class="reason-text">**Reason:** {result['reason']}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.subheader("Key Metrics")
-        st.markdown(f"**CVD (Cumulative Volume Delta):** {format_price(result['raw']['cvd'], decimals=2) if result['raw']['cvd'] is not None else 'N/A'}")
-        st.markdown(f"**Orderbook Imbalance:** {round(result['raw']['orderbook_imbalance']*100, 2) if result['raw']['orderbook_imbalance'] is not None else 'N/A'}%")
-        st.markdown(f"**Funding Rate:** {round(result['raw']['funding']*100, 4) if result['raw']['funding'] is not None else 'N/A'}%")
-        st.markdown(f"**Backtest Win Rate:** {round(result['raw']['backtest_win']*100, 2) if result['raw']['backtest_win'] is not None else 'N/A'}%")
-        st.markdown(f"**ATR (14-period):** {format_price(result['raw']['atr'], decimals=4) if result['raw']['atr'] is not None else 'N/A'}")
-        st.markdown(f"**Candle Signal:** {result['raw']['candle_signal'] if result['raw']['candle_signal'] is not None else 'N/A'}")
-        
-elif st.session_state.page == 'calculator':
-    st.title("Risk Calculator")
-    st.info("Here you can build your risk calculator.")
-    
-elif st.session_state.page == 'tracker':
-    st.title("Trade Tracker")
-    st.info("Here you can build your trade tracker.")
-    
-# --- شريط التنقل الثابت في الأسفل ---
-st.markdown('<div class="bottom-nav">', unsafe_allow_html=True)
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.button("Scanner", key="btn_scanner", on_click=lambda: st.session_state.update(page='main_scanner'))
-with col2:
-    st.button("Calculator", key="btn_calculator", on_click=lambda: st.session_state.update(page='calculator'))
-with col3:
-    st.button("Tracker", key="btn_tracker", on_click=lambda: st.session_state.update(page='tracker'))
-st.markdown('</div>', unsafe_allow_html=True)
-
-st.markdown("""
-<style>
-.st-emotion-cache-1pxx35k.e1f1d6gn2 > div {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-}
-.st-emotion-cache-1pxx35k.e1f1d6gn2 > div > span {
-    display: none;
-}
-.st-emotion-cache-1pxx35k.e1f1d6gn2:before {
-    font-family: 'Font Awesome 6 Free';
-    font-weight: 900;
-    font-size: 24px;
-    margin-bottom: 5px;
-}
-[data-testid="stButton-btn_scanner"]:before {
-    content: '\\f202'; /* الأيقونة: fa-brain */
-}
-[data-testid="stButton-btn_calculator"]:before {
-    content: '\\f1ec'; /* الأيقونة: fa-calculator */
-}
-[data-testid="stButton-btn_tracker"]:before {
-    content: '\\f201'; /* الأيقونة: fa-chart-line */
-}
-</style>
-""", unsafe_allow_html=True)
+        reason_class = "bullish" if result["recommend
