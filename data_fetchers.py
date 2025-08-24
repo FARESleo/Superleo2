@@ -1,7 +1,7 @@
 import requests
 import pandas as pd
 import time
-import streamlit as st 
+import streamlit as st
 
 OKX_BASE = "https://www.okx.com"
 
@@ -14,7 +14,15 @@ def okx_get(path, params=None, retries=3, delay=0.6):
             r = requests.get(url, params=params, timeout=10)
             if r.status_code == 200:
                 return r.json()
-        except Exception:
+            elif r.status_code == 429: # Handle rate limits
+                st.warning("Too many requests to OKX API. Please wait a moment.")
+                time.sleep(delay * (i + 1) * 2)
+                continue
+            else:
+                st.error(f"Error {r.status_code} from OKX API: {r.text}")
+                return None
+        except Exception as e:
+            st.error(f"Network error with OKX API: {e}")
             pass
         time.sleep(delay * (i + 1))
     return None
@@ -42,30 +50,36 @@ def fetch_ohlcv(instId, bar="1H", limit=200):
 def fetch_ticker(instId):
     j = okx_get("/api/v5/market/ticker", {"instId": instId})
     try:
-        return float(j["data"][0]["last"])
-    except Exception:
-        return None
+        if j and "data" in j and j["data"]:
+            return float(j["data"][0]["last"])
+    except (TypeError, ValueError, IndexError):
+        pass
+    return None
 
 @st.cache_data(ttl=60)
 def fetch_funding(instId):
     j = okx_get("/api/v5/public/funding-rate", {"instId": instId})
     try:
-        return float(j["data"][0]["fundingRate"])
-    except Exception:
-        return None
+        if j and "data" in j and j["data"]:
+            return float(j["data"][0]["fundingRate"])
+    except (TypeError, ValueError, IndexError):
+        pass
+    return None
 
 @st.cache_data(ttl=60)
 def fetch_oi(instId):
     j = okx_get("/api/v5/public/open-interest", {"instId": instId})
     try:
-        return float(j["data"][0]["oi"])
-    except Exception:
-        return None
+        if j and "data" in j and j["data"]:
+            return float(j["data"][0]["oi"])
+    except (TypeError, ValueError, IndexError):
+        pass
+    return None
 
 @st.cache_data(ttl=30)
 def fetch_orderbook(instId, depth=40):
     j = okx_get("/api/v5/market/books", {"instId": instId, "sz": str(depth)})
-    if not j or "data" not in j:
+    if not j or "data" not in j or not j["data"]:
         return None, None
     ob = j["data"][0]
     def to_df(raw, side):
@@ -114,11 +128,12 @@ def fetch_trades(instId, limit=400):
         return pd.DataFrame()
     return df.sort_values("ts").reset_index(drop=True)
 
-@st.cache_data(ttl=60) # تم التأكد من وجود هذا السطر لحل مشكلة 429
+@st.cache_data(ttl=60) # Caching with 60s TTL to prevent 429 error
 def get_live_market_data():
     try:
         all_coins = []
-        for page in range(1, 3):
+        # Fetching two pages to get a decent number of coins without over-requesting
+        for page in range(1, 3): 
             url = f"https://api.coingecko.com/api/v3/coins/markets"
             params = {
                 "vs_currency": "usd",
