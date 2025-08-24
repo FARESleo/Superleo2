@@ -5,6 +5,33 @@ from datetime import datetime
 from core_logic import compute_confidence, trading_calculator_app, live_market_tracker
 from data_fetchers import fetch_instruments
 
+# Set wide layout and hide sidebar
+st.set_page_config(layout="wide")
+
+st.markdown("""
+    <style>
+        section[data-testid="stSidebar"] {
+            display: none !important;
+        }
+        div.st-emotion-cache-121k3k1 {
+            visibility: hidden;
+            display: none;
+        }
+        header {
+            visibility: hidden;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+# ... Rest of your app.py code ...
+# The custom CSS for buttons, cards, etc., should be here.
+
+# Your existing code starts from here...
+st.markdown("<h1 style='font-size: 2.5rem; font-weight: bold; margin: 0;'>🧠 Smart Money Scanner</h1>", unsafe_allow_html=True)
+
+# ... rest of the code is the same ...
+
+
 # --- كود CSS لتصميم الواجهة ---
 st.markdown(
     """
