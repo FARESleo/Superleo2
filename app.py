@@ -17,20 +17,23 @@ st.markdown(
         z-index: -1;
     }
     .custom-go-button button {
-        background-image: linear-gradient(to right, #6A11CB, #2575FC);
+        background-image: linear-gradient(to right, #4CAF50, #2E8B57);
         color: white;
         font-size: 1.2rem;
         font-weight: bold;
-        padding: 10px 30px;
+        padding: 12px 30px;
         border-radius: 50px;
         border: none;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+        position: relative;
     }
     .custom-go-button button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 8px rgba(0, 0, 0, 0.3);
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        filter: brightness(1.1);
     }
+
     .custom-card {
         background-color: #F8F8F8;
         border-radius: 10px;
@@ -116,21 +119,22 @@ st.markdown(
         color: #e65100;
     }
     
-    /* --- التعديل على شريط التنقل السفلي --- */
+    /* --- تصميم الأزرار الجديدة --- */
     .bottom-navbar {
         position: fixed;
         bottom: 0;
         left: 0;
         right: 0;
         z-index: 1000;
-        background-color: white; 
-        box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+        background-color: rgba(255, 255, 255, 0.8);
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
         padding: 10px 20px;
         display: flex;
         justify-content: space-around;
         align-items: center;
-        border-top-left-radius: 10px;
-        border-top-right-radius: 10px;
+        border-top-left-radius: 20px;
+        border-top-right-radius: 20px;
+        backdrop-filter: blur(5px);
     }
     
     .bottom-navbar .st-cr .st-cv {
@@ -139,7 +143,6 @@ st.markdown(
         gap: 15px;
     }
     
-    /* هذا الجزء يستهدف الأزرار بشكل فعال */
     .bottom-navbar .st-cr .st-cv .st-ce label {
         display: flex;
         flex-direction: column;
@@ -151,25 +154,30 @@ st.markdown(
         border-radius: 50px;
         color: #6A11CB;
         background-color: #f0f0f0;
-        transition: all 0.2s ease;
+        transition: all 0.3s ease;
         cursor: pointer;
     }
 
-    /* لإخفاء نقطة الراديو الافتراضية */
     .bottom-navbar .st-cr .st-cv .st-ce input[type="radio"] {
         display: none;
     }
-
-    /* تأثير الهوفر */
+    
     .bottom-navbar .st-cr .st-cv .st-ce label:hover {
         background-color: #e0e0e0;
+        transform: translateY(-2px);
     }
 
-    /* لتحديد الزر المختار */
     .bottom-navbar .st-cr .st-cv .st-ce input[type="radio"]:checked + label {
         background-image: linear-gradient(to right, #6A11CB, #2575FC);
         color: white;
-        transform: translateY(-2px);
+        transform: translateY(-3px);
+        box-shadow: 0 0 10px #6A11CB, 0 0 20px #6A11CB, 0 0 30px #2575FC; /* تأثير النيون */
+    }
+
+    /* لتحريك الأيقونة عند التحديد */
+    .bottom-navbar .st-cr .st-cv .st-ce input[type="radio"]:checked + label .css-1dp5x4q {
+        transform: translateY(-5px);
+        transition: transform 0.3s ease;
     }
 
     </style>
@@ -224,10 +232,9 @@ def run_analysis_clicked():
 with header_col1:
     with st.container(border=False):
         st.markdown('<div class="custom-go-button">', unsafe_allow_html=True)
-        if st.button("🚀 انطلق!", use_container_width=True):
+        if st.button("🚀 ابدأ التحليل!", use_container_width=True):
             run_analysis_clicked()
         st.markdown('</div>', unsafe_allow_html=True)
-
 
 with header_col2:
     st.markdown(f"**آخر تحديث:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -391,7 +398,7 @@ if selected_page == "📊 التحليل":
             st.json(result["raw"])
 
     else:
-        st.info("حدد الأداة/الإطار الزمني واضغط 'انطلق' للبدء.")
+        st.info("حدد الأداة/الإطار الزمني واضغط 'ابدأ التحليل!' للبدء.")
 
 elif selected_page == "🧮 الحاسبة":
     trading_calculator_app()
