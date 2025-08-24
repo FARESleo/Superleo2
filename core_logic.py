@@ -1,10 +1,10 @@
 import numpy as np
 import pandas as pd
 from math import isnan
+from datetime import datetime
 from data_fetchers import fetch_ohlcv, fetch_ticker, fetch_funding, fetch_oi, fetch_orderbook, fetch_trades, get_live_market_data
 import streamlit as st
 import requests
-from datetime import datetime
 
 # ----------------------------
 # Metrics
@@ -138,10 +138,10 @@ def compute_confidence(instId, bar="1H"):
     metrics = {"funding": fund_score, "oi": oi_score, "cvd": cvd_score, "orderbook": ob_score, "backtest": bt_score}
     weights = {"backtest":0.3, "orderbook":0.25, "cvd":0.2, "oi":0.15, "funding":0.1}
     conf = sum(metrics[k]*weights[k] for k in metrics)
-    confidence_pct = round(max(0, min(conf*100,100)),1)
+    confidence_pct = round(max(0, min(conf*100,100)),1) if not isnan(conf) else None
     
     atr = calculate_atr(ohlcv, period=14)
-    if atr is None or price is None:
+    if atr is None or price is None or isnan(atr):
         label = "⚠️ Neutral"
         recommendation = "Wait"
         entry = price
@@ -151,26 +151,26 @@ def compute_confidence(instId, bar="1H"):
     
     else:
         is_bullish_strong = (
-            (confidence_pct >= 65) and
+            (confidence_pct is not None and confidence_pct >= 65) and
             (cvd is not None and cvd > 0) and
             (ob_imb is not None and ob_imb > 0) and
             (candle_signal in ["Bullish Engulfing", "Bullish Morning Star"])
         )
         
         is_bullish_weak = (
-            (confidence_pct >= 50) and
+            (confidence_pct is not None and confidence_pct >= 50) and
             ((cvd is not None and cvd > 0) or (candle_signal in ["Bullish Engulfing", "Bullish Morning Star"]))
         )
         
         is_bearish_strong = (
-            (confidence_pct <= 35) and
+            (confidence_pct is not None and confidence_pct <= 35) and
             (cvd is not None and cvd < 0) and
             (ob_imb is not None and ob_imb < 0) and
             (candle_signal == "Bearish Engulfing")
         )
 
         is_bearish_weak = (
-            (confidence_pct <= 50) and
+            (confidence_pct is not None and confidence_pct <= 50) and
             ((cvd is not None and cvd < 0) or (candle_signal == "Bearish Engulfing"))
         )
         
