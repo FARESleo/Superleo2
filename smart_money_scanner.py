@@ -6,7 +6,7 @@ import time
 from math import isnan
 from datetime import datetime
 
-# --- كود إضافة صورة الخلفية ---
+# --- كود CSS لتصميم الواجهة ---
 st.markdown(
     """
     <style>
@@ -15,7 +15,6 @@ st.markdown(
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
-        /* هذا التعديل الجديد */
         z-index: -1;
     }
     .custom-card {
@@ -102,16 +101,62 @@ st.markdown(
         background-color: #fff8f0;
         color: #e65100;
     }
+
+    /* --- كود CSS الجديد لتثبيت الشريط العلوي وتصميم الأزرار --- */
+    /* Target the main app container for the fixed header */
+    .stApp > header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 999;
+        padding: 15px;
+        background-color: white; /* Add a background color to make it visible */
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+    }
+    
+    /* Center the main content to avoid it being hidden under the fixed header */
+    .stApp > div:first-child > div:nth-child(2) {
+        padding-top: 100px; /* Adjust this value to match header height */
+    }
+    
+    /* Buttons styling - removed width:100% to allow side-by-side layout */
+    div.stButton > button {
+        background-image: linear-gradient(to right, #6A11CB, #2575FC);
+        color: white;
+        padding: 12px 20px;
+        font-size: 16px;
+        font-weight: bold;
+        border-radius: 8px;
+        border: none;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        cursor: pointer;
+    }
+    div.stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
+    }
+    div.stButton > button#calc_button {
+        background-image: linear-gradient(to right, #FFA17F, #FF4B2B);
+    }
+    div.stButton > button#tracker_button {
+        background-image: linear-gradient(to right, #11c062, #07712d);
+    }
+    
     </style>
     """,
     unsafe_allow_html=True
 )
 
+# --- الكود الأصلي للدوال والمكونات (بدون تغيير) ---
 OKX_BASE = "https://www.okx.com"
 
-# ----------------------------
 # HTTP helper with retries
-# ----------------------------
 @st.cache_data(ttl=600)
 def okx_get(path, params=None, retries=3, delay=0.6):
     url = f"{OKX_BASE}{path}"
@@ -125,9 +170,7 @@ def okx_get(path, params=None, retries=3, delay=0.6):
         time.sleep(delay * (i + 1))
     return None
 
-# ----------------------------
 # Data fetchers (cached)
-# ----------------------------
 @st.cache_data(ttl=600)
 def fetch_instruments(inst_type="SWAP"):
     j = okx_get("/api/v5/public/instruments", {"instType": inst_type})
@@ -452,6 +495,21 @@ def format_price(price, decimals=None):
         else: decimals = 4
     return f"{price:,.{decimals}f}"
 
+# New function to calculate PnL percentages
+def calculate_pnl_percentages(entry_price, take_profit, stop_loss):
+    if entry_price is None or take_profit is None or stop_loss is None or entry_price == 0:
+        return None, None
+    
+    profit_pct = ((take_profit - entry_price) / entry_price) * 100
+    loss_pct = ((stop_loss - entry_price) / entry_price) * 100
+    
+    # Correct for long vs short
+    is_long = take_profit > entry_price
+    if not is_long:
+        profit_pct, loss_pct = loss_pct, profit_pct
+    
+    return profit_pct, loss_pct
+
 # Initialize session state
 if 'analysis_results' not in st.session_state:
     st.session_state.analysis_results = None
@@ -459,6 +517,12 @@ if 'selected_instId' not in st.session_state:
     st.session_state.selected_instId = "BTC-USDT-SWAP"
 if 'bar' not in st.session_state:
     st.session_state.bar = "1H"
+if 'show_calculator' not in st.session_state:
+    st.session_state.show_calculator = False
+if 'show_tracker' not in st.session_state:
+    st.session_state.show_tracker = False
+if 'selected_leverage' not in st.session_state:
+    st.session_state.selected_leverage = None
 
 # Fetch all instruments once
 all_instruments = fetch_instruments("SWAP") + fetch_instruments("SPOT")
@@ -466,140 +530,42 @@ if not all_instruments:
     st.error("Unable to load instruments from OKX.")
     st.stop()
     
-# Title and Button in the same row
-header_col1, header_col2 = st.columns([0.7, 0.3])
-with header_col1:
-    st.header("🧠 Smart Money Scanner")
+# --- الشريط العلوي الثابت مع الأزرار ---
+st.markdown("<h1 style='font-size: 2.5rem; font-weight: bold; margin: 0;'>🧠 Smart Money Scanner</h1>", unsafe_allow_html=True)
+header_col1, header_col2, header_col3 = st.columns(3)
 
 def run_analysis_clicked():
     st.session_state.analysis_results = compute_confidence(st.session_state.selected_instId, st.session_state.bar)
+    
+def toggle_calculator():
+    st.session_state.show_calculator = not st.session_state.show_calculator
+    st.session_state.selected_leverage = None
+
+def toggle_tracker():
+    st.session_state.show_tracker = not st.session_state.show_tracker
+    
+with header_col1:
+    if st.button("🚀 Go"):
+        run_analysis_clicked()
 
 with header_col2:
-    st.markdown("""
-        <style>
-        div.stButton > button {
-            background-image: linear-gradient(to right, #6A11CB, #2575FC);
-            color: white;
-            padding: 12px 30px;
-            font-size: 16px;
-            font-weight: bold;
-            border-radius: 8px;
-            border: none;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-            width: 100%;
-        }
-        div.stButton > button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
-        }
-        </style>
-    """, unsafe_allow_html=True)
-    if st.button("Go"):
-        run_analysis_clicked()
-        
-# Display last updated time
-st.markdown(f"**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    st.button("🧮 Calculator", on_click=toggle_calculator, key="calc_button")
+
+with header_col3:
+    st.button("📊 Tracker", on_click=toggle_tracker, key="tracker_button")
+
+
+# Display last updated time and user inputs
+st.markdown(f"**آخر تحديث:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 st.markdown("---")
 
-# User inputs
-st.session_state.selected_instId = st.selectbox("Select Instrument", all_instruments, index=all_instruments.index(st.session_state.selected_instId) if st.session_state.selected_instId in all_instruments else 0)
-st.session_state.bar = st.selectbox("Timeframe", ["30m", "15m", "1H", "6H", "12H"], index=["30m", "15m", "1H", "6H", "12H"].index(st.session_state.bar) if st.session_state.bar in ["30m", "15m", "1H", "6H", "12H"] else 0)
+st.session_state.selected_instId = st.selectbox("حدد الأداة", all_instruments, index=all_instruments.index(st.session_state.selected_instId) if st.session_state.selected_instId in all_instruments else 0)
+st.session_state.bar = st.selectbox("الإطار الزمني", ["30m", "15m", "1H", "6H", "12H"], index=["30m", "15m", "1H", "6H", "12H"].index(st.session_state.bar) if st.session_state.bar in ["30m", "15m", "1H", "6H", "12H"] else 0)
 
 
 # Display results if available
 if st.session_state.analysis_results:
     result = st.session_state.analysis_results
-    
-    # Custom CSS for the cards and progress bar
-    st.markdown("""
-        <style>
-        .custom-card {
-            background-color: #F8F8F8;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 15px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            color: #333;
-        }
-        .card-header {
-            font-size: 14px;
-            color: #777;
-            text-transform: uppercase;
-            font-weight: bold;
-        }
-        .card-value {
-            font-size: 28px;
-            font-weight: bold;
-            margin-top: 5px;
-        }
-        .progress-bar-container {
-            background-color: #ddd;
-            border-radius: 50px;
-            height: 10px;
-            width: 100%;
-            margin-top: 10px;
-        }
-        .progress-bar {
-            height: 100%;
-            border-radius: 50px;
-            transition: width 0.5s ease-in-out;
-        }
-        .trade-plan-card {
-            background-color: #f0f0f0;
-            border-left: 5px solid #6A11CB;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 15px;
-        }
-        .trade-plan-title {
-            font-size: 24px;
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 15px;
-        }
-        .trade-plan-metric {
-            margin-bottom: 15px;
-        }
-        .trade-plan-metric-label {
-            font-size: 16px;
-            color: #555;
-            font-weight: bold;
-        }
-        .trade-plan-metric-value {
-            font-size: 20px;
-            font-weight: bold;
-        }
-        .reason-card {
-            background-color: #f0f4f7;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 10px;
-            border-left: 4px solid;
-        }
-        .reason-text {
-            font-size: 16px;
-            line-height: 1.6;
-            margin-top: 5px;
-            font-style: italic;
-        }
-        .reason-card.bullish {
-            border-color: #4CAF50;
-            background-color: #f0fbf0;
-            color: #2e7d32;
-        }
-        .reason-card.bearish {
-            border-color: #d32f2f;
-            background-color: #fff0f0;
-            color: #b71c1c;
-        }
-        .reason-card.neutral {
-            border-color: #ff9800;
-            background-color: #fff8f0;
-            color: #e65100;
-        }
-        </style>
-    """, unsafe_allow_html=True)
     
     # Get the confidence color based on the percentage
     def get_confidence_color(pct):
@@ -684,6 +650,13 @@ if st.session_state.analysis_results:
         """, unsafe_allow_html=True)
         
     with trade_plan_col2:
+        # Calculate PnL percentages
+        profit_pct, loss_pct = calculate_pnl_percentages(
+            result['entry'], 
+            result['target'], 
+            result['stop']
+        )
+        
         st.markdown(f"""
             <div class="trade-plan-metric">
                 <div class="trade-plan-metric-label">🔍 سعر الدخول:</div>
@@ -691,20 +664,20 @@ if st.session_state.analysis_results:
             </div>
             <div class="trade-plan-metric">
                 <div class="trade-plan-metric-label">🎯 السعر المستهدف:</div>
-                <div class="trade-plan-metric-value">{format_price(result['target'])}</div>
+                <div class="trade-plan-metric-value">{format_price(result['target'])} <span style='font-size: 14px; color: green;'>({profit_pct:.2f}%)</span></div>
             </div>
             <div class="trade-plan-metric">
                 <div class="trade-plan-metric-label">🛑 وقف الخسارة:</div>
-                <div class="trade-plan-metric-value">{format_price(result['stop'])}</div>
+                <div class="trade-plan-metric-value">{format_price(result['stop'])} <span style='font-size: 14px; color: red;'>({loss_pct:.2f}%)</span></div>
             </div>
         """, unsafe_allow_html=True)
         
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("---")
-    st.markdown("### 📊 المقاييس الأساسية")
     
-    # ***هذا هو الكود المحدث لحل المشكلة***
+    # Display raw metrics
+    st.markdown("### 📊 المقاييس الأساسية")
     
     metrics_data = {
         "funding": {"label": "التمويل", "value": result["metrics"]["funding"], "weight": result["weights"]["funding"]},
@@ -716,7 +689,6 @@ if st.session_state.analysis_results:
 
     icons = {"funding":"💰","oi":"📊","cvd":"📈","orderbook":"⚖️","backtest":"🧪"}
     
-    # هنا تم إضافة حلقة التكرار لإنشاء الأعمدة والمقاييس داخلها
     cols = st.columns(len(metrics_data))
 
     for idx, k in enumerate(metrics_data):
@@ -725,7 +697,6 @@ if st.session_state.analysis_results:
             weight = metrics_data[k]["weight"]
             contrib = round(score * weight * 100, 2)
             
-            # هنا يتم عرض المقياس بشكل صحيح داخل كل عمود
             st.metric(label=f"{icons[k]} {metrics_data[k]['label']}", value=f"{score:.3f}", delta=f"w={weight}")
             st.caption(f"Contribution: {contrib}%")
 
@@ -742,3 +713,192 @@ if st.session_state.analysis_results:
 
 else:
     st.info("حدد الأداة/الإطار الزمني واضغط 'انطلق' للبدء.")
+
+# ----------------------------------------------------
+# 🌟 الحاسبة الجديدة (كود بايثون) 🌟
+# ----------------------------------------------------
+def trading_calculator_app():
+    """
+    Creates and manages the trading calculator UI using pure Streamlit.
+    """
+    
+    imr = st.number_input("الهامش المبدئي (IMR %)", min_value=0.01, value=2.0, step=0.1, help="النسبة المئوية من إجمالي قيمة الصفقة التي تودعها.")
+    mmr = st.number_input("هامش الحِفاظ (MMR %)", min_value=0.01, value=1.0, step=0.1, help="الحد الأدنى من الهامش المطلوب للحفاظ على الصفقة.")
+    
+    if imr > mmr and imr > 0:
+        margin_diff = imr - mmr
+        max_leverage = round(100 / margin_diff, 2)
+        leverage_options = {
+            "5x (منخفضة)": 5,
+            "10x (منخفضة)": 10,
+            "20x (متوسطة)": 20,
+            "30x (متوسطة)": 30,
+            "50x (عالية)": 50,
+            "100x (عالية جداً)": 100,
+            f"{max_leverage}x (القصوى)": max_leverage
+        }
+        
+        valid_leverage_options = {k: v for k, v in leverage_options.items() if v <= max_leverage}
+        
+        st.markdown("**اختر الرافعة المالية**")
+        leverage_cols = st.columns(len(valid_leverage_options))
+        
+        for i, (label, value) in enumerate(valid_leverage_options.items()):
+            if leverage_cols[i].button(label, key=f"lev_btn_{value}", use_container_width=True):
+                st.session_state.selected_leverage = value
+    else:
+        st.warning("الرجاء إدخال قيم صالحة للهامش المبدئي وهامش الحفاظ.")
+        st.session_state.selected_leverage = None
+
+    col1, col2 = st.columns(2)
+    with col1:
+        capital = st.number_input("المبلغ (USDT)", min_value=0.01, value=10.0, step=0.1)
+    with col2:
+        current_price = st.number_input("السعر الحالي", min_value=0.01, value=25000.0, step=0.01)
+
+    col3, col4 = st.columns(2)
+    with col3:
+        target_price = st.number_input("سعر الهدف", min_value=0.01, value=26000.0, step=0.01)
+    with col4:
+        direction = st.selectbox("الاتجاه", ["📈 شراء (Long)", "📉 بيع (Short)"])
+    
+    if st.session_state.selected_leverage and capital and current_price and target_price and imr and mmr:
+        leverage = st.session_state.selected_leverage
+        is_long = direction == "📈 شراء (Long)"
+        
+        margin_diff = imr - mmr
+        price_change_pct = ((target_price - current_price) / current_price) * 100
+        actual_price_change = price_change_pct if is_long else -price_change_pct
+        roi_percent = actual_price_change * leverage
+        pnl_value = (capital * roi_percent) / 100
+        
+        if is_long:
+            liquidation_price = current_price * (1 - (margin_diff / 100))
+        else:
+            liquidation_price = current_price * (1 + (margin_diff / 100))
+            
+        st.markdown("---")
+        
+        metrics_col1, metrics_col2, metrics_col3 = st.columns(3)
+        with metrics_col1:
+            st.metric(label="فرق الهامش", value=f"{margin_diff:.2f}%")
+        with metrics_col2:
+            st.metric(label="التغير %", value=f"{actual_price_change:.2f}%")
+        with metrics_col3:
+            st.metric(label="ROI %", value=f"{roi_percent:.2f}%")
+            
+        metrics_col4, metrics_col5 = st.columns(2)
+        with metrics_col4:
+            pnl_color = "green" if pnl_value >= 0 else "red"
+            st.markdown(f"**<p style='color: {pnl_color}; font-size: 1.5rem;'>PnL: {pnl_value:.2f} USDT</p>**", unsafe_allow_html=True)
+        with metrics_col5:
+            liq_color = "red"
+            st.markdown(f"**<p style='color: {liq_color}; font-size: 1.5rem;'>سعر التصفية: {liquidation_price:.4f}</p>**", unsafe_allow_html=True)
+
+
+# ----------------------------------------------------
+# 🌟 متتبع السوق اللحظي (كود بايثون) 🌟
+# ----------------------------------------------------
+
+@st.cache_data(ttl=60)
+def get_live_market_data():
+    """Fetches live market data from CoinGecko API."""
+    try:
+        all_coins = []
+        for page in range(1, 3):
+            url = f"https://api.coingecko.com/api/v3/coins/markets"
+            params = {
+                "vs_currency": "usd",
+                "order": "market_cap_desc",
+                "per_page": 200,
+                "page": page,
+                "price_change_percentage": "24h"
+            }
+            response = requests.get(url, params=params, timeout=10)
+            if response.status_code == 200:
+                all_coins.extend(response.json())
+            else:
+                st.error(f"Failed to fetch data from CoinGecko. Status code: {response.status_code}")
+                return pd.DataFrame()
+        return pd.DataFrame(all_coins)
+    except Exception as e:
+        st.error(f"Error fetching live data: {e}")
+        return pd.DataFrame()
+
+
+def live_market_tracker():
+    """Renders the Live Market Tracker UI."""
+    st.markdown("---")
+    st.header("📈 متتبع السوق اللحظي")
+    st.write("استكشف العملات ذات التغيرات السعرية الكبيرة خلال الـ 24 ساعة الماضية.")
+
+    # UI Controls
+    cols = st.columns(3)
+    with cols[0]:
+        threshold = st.selectbox("عتبة التغيير (%):", options=[1, 5, 10, 20, 50, 100], index=4)
+    with cols[1]:
+        search_query = st.text_input("ابحث عن عملة...").lower()
+    with cols[2]:
+        filter_type = st.selectbox("الفلتر:", options=["الكل", "صعود فقط", "هبوط فقط"], format_func=lambda x: x)
+
+    # Fetch and filter data
+    with st.spinner("جارٍ تحديث بيانات السوق اللحظية..."):
+        all_coins_df = get_live_market_data()
+
+    if all_coins_df.empty:
+        st.warning("تعذر جلب البيانات. يرجى المحاولة لاحقاً.")
+        return
+
+    # Filter logic
+    filtered_df = all_coins_df[all_coins_df['price_change_percentage_24h'].notna()].copy()
+    filtered_df['price_change_abs'] = filtered_df['price_change_percentage_24h'].abs()
+    filtered_df = filtered_df[filtered_df['price_change_abs'] >= threshold]
+
+    if filter_type == "صعود فقط":
+        filtered_df = filtered_df[filtered_df['price_change_percentage_24h'] > 0]
+    elif filter_type == "هبوط فقط":
+        filtered_df = filtered_df[filtered_df['price_change_percentage_24h'] < 0]
+
+    if search_query:
+        filtered_df = filtered_df[filtered_df['name'].str.lower().str.contains(search_query) | 
+                                 filtered_df['symbol'].str.lower().str.contains(search_query)]
+    
+    # Use only the symbol
+    filtered_df['رمز العملة'] = filtered_df['symbol'].str.upper()
+    
+    # Sort by price change
+    filtered_df = filtered_df.sort_values(by='price_change_abs', ascending=False)
+    
+    if filtered_df.empty:
+        st.info("لا توجد عملات مطابقة للمعايير المحددة.")
+    else:
+        # Prepare data for display
+        display_df = filtered_df[[
+            'رمز العملة',
+            'current_price',
+            'price_change_percentage_24h',
+            'high_24h',
+            'low_24h'
+        ]].rename(columns={
+            'رمز العملة': 'الرمز',
+            'current_price': 'السعر ($)',
+            'price_change_percentage_24h': 'التغيير (24س) %',
+            'high_24h': 'أعلى سعر (24س) ($)',
+            'low_24h': 'أدنى سعر (24س) ($)'
+        })
+        
+        # Format columns for better readability
+        display_df['السعر ($)'] = display_df['السعر ($)'].apply(lambda x: f"{x:,.4f}" if x > 0.001 else f"{x:,.8f}")
+        display_df['التغيير (24س) %'] = display_df['التغيير (24س) %'].apply(lambda x: f"{x:,.2f}%")
+        display_df['أعلى سعر (24س) ($)'] = display_df['أعلى سعر (24س) ($)'].apply(lambda x: f"{x:,.4f}" if x > 0.001 else f"{x:,.8f}")
+        display_df['أدنى سعر (24س) ($)'] = display_df['أدنى سعر (24س) ($)'].apply(lambda x: f"{x:,.4f}" if x > 0.001 else f"{x:,.8f}")
+        
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
+        st.caption(f"آخر تحديث: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+
+# Check which tool to display based on session state
+if st.session_state.show_calculator:
+    trading_calculator_app()
+elif st.session_state.show_tracker:
+    live_market_tracker()
