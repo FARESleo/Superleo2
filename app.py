@@ -1,7 +1,7 @@
 import streamlit as st
-from datetime import datetime
 import pandas as pd
 from math import isnan
+from datetime import datetime
 from core_logic import compute_confidence, trading_calculator_app, live_market_tracker
 from data_fetchers import fetch_instruments
 
@@ -15,6 +15,21 @@ st.markdown(
         background-position: center;
         background-attachment: fixed;
         z-index: -1;
+    }
+    .custom-go-button button {
+        background-image: linear-gradient(to right, #6A11CB, #2575FC);
+        color: white;
+        font-size: 1.2rem;
+        font-weight: bold;
+        padding: 10px 30px;
+        border-radius: 50px;
+        border: none;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .custom-go-button button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 8px rgba(0, 0, 0, 0.3);
     }
     .custom-card {
         background-color: #F8F8F8;
@@ -189,8 +204,12 @@ def run_analysis_clicked():
     st.session_state.analysis_results = compute_confidence(st.session_state.selected_instId, st.session_state.bar)
     
 with header_col1:
-    if st.button("🚀 Go"):
-        run_analysis_clicked()
+    with st.container(border=False):
+        st.markdown('<div class="custom-go-button">', unsafe_allow_html=True)
+        if st.button("🚀 انطلق!", use_container_width=True):
+            run_analysis_clicked()
+        st.markdown('</div>', unsafe_allow_html=True)
+
 
 with header_col2:
     st.markdown(f"**آخر تحديث:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -344,6 +363,7 @@ if selected_page == "📊 التحليل":
                 st.caption(f"Contribution: {contrib}%")
 
         st.markdown("---")
+        
         st.markdown("### 🔍 تحليل إضافي")
         st.markdown(f"• **الدعم:** {format_price(result['raw']['support'])} | **المقاومة:** {format_price(result['raw']['resistance'])}")
         st.markdown(f"• **إشارة الشمعة:** {result['raw']['candle_signal'] if result['raw']['candle_signal'] else 'لا يوجد'}")
