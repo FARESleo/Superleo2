@@ -113,28 +113,31 @@ st.markdown(
         box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
         padding: 10px 20px;
         display: flex;
-        justify-content: center;
+        justify-content: space-around;
         align-items: center;
         border-top-left-radius: 10px;
         border-top-right-radius: 10px;
     }
-
-    .bottom-navbar .st-bw { /* Targeting Streamlit's radio buttons */
+    
+    .bottom-navbar .st-cr .st-cv {
+        flex-direction: row;
+        justify-content: space-around;
+        gap: 15px;
+    }
+    
+    .bottom-navbar .st-cr .st-cv .st-ce,
+    .bottom-navbar .st-cr .st-cv .st-cf {
         border-radius: 50px;
         padding: 10px 20px;
         color: #6A11CB; 
         background-color: #f0f0f0;
         transition: all 0.2s ease;
-        margin: 0 5px;
-        border: none !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
-    .bottom-navbar .st-bw[aria-selected="true"] {
+    .bottom-navbar .st-cr .st-cv .st-ce[data-selected="true"] {
         background-image: linear-gradient(to right, #6A11CB, #2575FC);
         color: white;
         transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     }
 
     </style>
