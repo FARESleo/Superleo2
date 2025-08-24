@@ -17,7 +17,7 @@ st.markdown(
         background-position: center;
         background-attachment: fixed;
     }
-    
+
     /* الشريط الثابت في الأسفل */
     .bottom-nav {
         position: fixed;
@@ -32,42 +32,25 @@ st.markdown(
         box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
         z-index: 1000;
     }
-    
-    /* شكل الأزرار */
-    .nav-btn {
-        background-color: transparent;
-        border: none;
-        color: white;
-        text-align: center;
-        font-size: 10px;
-        padding: 10px;
-        transition: color 0.3s ease;
-        cursor: pointer;
-        display: flex;
+    .st-emotion-cache-1pxx35k.e1f1d6gn2 { /* هذه الفئة تستهدف الأزرار في الأعمدة */
+        display: flex !important;
         flex-direction: column;
         align-items: center;
-        text-decoration: none;
-        
+        color: white;
+        background-color: transparent;
+        border: none;
+        padding: 0;
+        margin: 0;
     }
-    
-    .nav-btn .icon {
-        font-size: 24px;
-        margin-bottom: 5px;
-    }
-    
-    .nav-btn.active {
-        color: #6A11CB; /* لون الزر النشط */
-    }
-    
-    .nav-btn:hover {
+
+    .st-emotion-cache-1pxx35k.e1f1d6gn2:hover {
         color: #6A11CB;
     }
     
-    /* إخفاء أزرار Streamlit الافتراضية */
-    div.stButton > button {
-        display: none;
+    .st-emotion-cache-1pxx35k.e1f1d6gn2[data-active=true] {
+        color: #6A11CB;
     }
-    
+
     /* بقية الأنماط القديمة */
     .custom-card {
         background-color: #F8F8F8;
@@ -610,36 +593,43 @@ elif st.session_state.page == 'tracker':
     st.info("Here you can build your trade tracker.")
     
 # --- شريط التنقل الثابت في الأسفل ---
-st.markdown(
-    f"""
-    <div class="bottom-nav">
-        <a href="#" onclick="document.getElementById('btn_scanner').click(); return false;" class="nav-btn {'active' if st.session_state.page == 'main_scanner' else ''}">
-            <i class="fas fa-brain icon"></i>
-            <span>Scanner</span>
-        </a>
-        <a href="#" onclick="document.getElementById('btn_calculator').click(); return false;" class="nav-btn {'active' if st.session_state.page == 'calculator' else ''}">
-            <i class="fas fa-calculator icon"></i>
-            <span>Calculator</span>
-        </a>
-        <a href="#" onclick="document.getElementById('btn_tracker').click(); return false;" class="nav-btn {'active' if st.session_state.page == 'tracker' else ''}">
-            <i class="fas fa-chart-line icon"></i>
-            <span>Tracker</span>
-        </a>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
-st.button("Scanner", key="btn_scanner", on_click=lambda: st.session_state.update(page='main_scanner'))
-st.button("Calculator", key="btn_calculator", on_click=lambda: st.session_state.update(page='calculator'))
-st.button("Tracker", key="btn_tracker", on_click=lambda: st.session_state.update(page='tracker'))
+st.markdown('<div class="bottom-nav">', unsafe_allow_html=True)
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.button("Scanner", key="btn_scanner", on_click=lambda: st.session_state.update(page='main_scanner'))
+with col2:
+    st.button("Calculator", key="btn_calculator", on_click=lambda: st.session_state.update(page='calculator'))
+with col3:
+    st.button("Tracker", key="btn_tracker", on_click=lambda: st.session_state.update(page='tracker'))
+st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown("""
 <style>
-div.stButton {
-    visibility: hidden;
-    height: 0;
-    margin: 0;
+.st-emotion-cache-1pxx35k.e1f1d6gn2 > div {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+.st-emotion-cache-1pxx35k.e1f1d6gn2 > div > span {
+    display: none;
+}
+.st-emotion-cache-1pxx35k.e1f1d6gn2:before {
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    font-size: 24px;
+    margin-bottom: 5px;
+}
+[data-testid="stButton-btn_scanner"]:before {
+    content: '\\f202'; /* الأيقونة: fa-brain */
+}
+[data-testid="stButton-btn_calculator"]:before {
+    content: '\\f1ec'; /* الأيقونة: fa-calculator */
+}
+[data-testid="stButton-btn_tracker"]:before {
+    content: '\\f201'; /* الأيقونة: fa-chart-line */
 }
 </style>
 """, unsafe_allow_html=True)
