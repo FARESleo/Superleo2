@@ -385,7 +385,7 @@ if selected_page == "📊 التحليل":
             with cols[idx]:
                 score = metrics_data[k]["value"]
                 weight = metrics_data[k]["weight"]
-                contrib = round(score * weight * 100, 2)
+                contrib = round(score * weight * 100, 2) if score is not None else "N/A"
                 
                 st.metric(label=f"{icons[k]} {metrics_data[k]['label']}", value=f"{score:.3f}" if score is not None and not isnan(score) else "N/A", delta=f"w={weight}")
                 st.caption(f"Contribution: {contrib}%")
