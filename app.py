@@ -116,7 +116,7 @@ st.markdown(
         color: #e65100;
     }
     
-    /* --- New CSS for Bottom Navigation Bar --- */
+    /* --- التعديل على شريط التنقل السفلي --- */
     .bottom-navbar {
         position: fixed;
         bottom: 0;
@@ -139,16 +139,34 @@ st.markdown(
         gap: 15px;
     }
     
-    .bottom-navbar .st-cr .st-cv .st-ce,
-    .bottom-navbar .st-cr .st-cv .st-cf {
-        border-radius: 50px;
+    /* هذا الجزء يستهدف الأزرار بشكل فعال */
+    .bottom-navbar .st-cr .st-cv .st-ce label {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        font-size: 1rem;
+        font-weight: bold;
+        text-align: center;
         padding: 10px 20px;
-        color: #6A11CB; 
+        border-radius: 50px;
+        color: #6A11CB;
         background-color: #f0f0f0;
         transition: all 0.2s ease;
+        cursor: pointer;
     }
-    
-    .bottom-navbar .st-cr .st-cv .st-ce[data-selected="true"] {
+
+    /* لإخفاء نقطة الراديو الافتراضية */
+    .bottom-navbar .st-cr .st-cv .st-ce input[type="radio"] {
+        display: none;
+    }
+
+    /* تأثير الهوفر */
+    .bottom-navbar .st-cr .st-cv .st-ce label:hover {
+        background-color: #e0e0e0;
+    }
+
+    /* لتحديد الزر المختار */
+    .bottom-navbar .st-cr .st-cv .st-ce input[type="radio"]:checked + label {
         background-image: linear-gradient(to right, #6A11CB, #2575FC);
         color: white;
         transform: translateY(-2px);
@@ -308,7 +326,6 @@ if selected_page == "📊 التحليل":
         with trade_plan_col1:
             st.markdown(f"""
                 <div class="reason-card {reason_class}">
-                    <div class="trade-plan-metric-label">السبب:</div>
                     <div class="reason-text">{result['reason']}</div>
                 </div>
             """, unsafe_allow_html=True)
