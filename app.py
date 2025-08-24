@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from math import isnan 
+from math import isnan
 from datetime import datetime
 from core_logic import compute_confidence, trading_calculator_app, live_market_tracker
 from data_fetchers import fetch_instruments
@@ -17,21 +17,19 @@ st.markdown(
         z-index: -1;
     }
     .custom-go-button button {
-        background-image: linear-gradient(to right, #4CAF50, #2E8B57);
+        background-image: linear-gradient(to right, #6A11CB, #2575FC);
         color: white;
         font-size: 1.2rem;
         font-weight: bold;
-        padding: 12px 30px;
+        padding: 10px 30px;
         border-radius: 50px;
         border: none;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-        transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
-        position: relative;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
     .custom-go-button button:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-        filter: brightness(1.1);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 8px rgba(0, 0, 0, 0.3);
     }
     .custom-card {
         background-color: #F8F8F8;
@@ -118,22 +116,21 @@ st.markdown(
         color: #e65100;
     }
     
-    /* --- تصميم الأزرار الجديدة --- */
+    /* --- التعديل على شريط التنقل السفلي --- */
     .bottom-navbar {
         position: fixed;
         bottom: 0;
         left: 0;
         right: 0;
         z-index: 1000;
-        background-color: rgba(255, 255, 255, 0.8);
-        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+        background-color: white; 
+        box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
         padding: 10px 20px;
         display: flex;
         justify-content: space-around;
         align-items: center;
-        border-top-left-radius: 20px;
-        border-top-right-radius: 20px;
-        backdrop-filter: blur(5px);
+        border-top-left-radius: 10px;
+        border-top-right-radius: 10px;
     }
     
     .bottom-navbar .st-cr .st-cv {
@@ -142,6 +139,7 @@ st.markdown(
         gap: 15px;
     }
     
+    /* هذا الجزء يستهدف الأزرار بشكل فعال */
     .bottom-navbar .st-cr .st-cv .st-ce label {
         display: flex;
         flex-direction: column;
@@ -153,30 +151,25 @@ st.markdown(
         border-radius: 50px;
         color: #6A11CB;
         background-color: #f0f0f0;
-        transition: all 0.3s ease;
+        transition: all 0.2s ease;
         cursor: pointer;
     }
 
+    /* لإخفاء نقطة الراديو الافتراضية */
     .bottom-navbar .st-cr .st-cv .st-ce input[type="radio"] {
         display: none;
     }
-    
+
+    /* تأثير الهوفر */
     .bottom-navbar .st-cr .st-cv .st-ce label:hover {
         background-color: #e0e0e0;
-        transform: translateY(-2px);
     }
 
+    /* لتحديد الزر المختار */
     .bottom-navbar .st-cr .st-cv .st-ce input[type="radio"]:checked + label {
         background-image: linear-gradient(to right, #6A11CB, #2575FC);
         color: white;
-        transform: translateY(-3px);
-        box-shadow: 0 0 10px #6A11CB, 0 0 20px #6A11CB, 0 0 30px #2575FC; /* تأثير النيون */
-    }
-
-    /* لتحريك الأيقونة عند التحديد */
-    .bottom-navbar .st-cr .st-cv .st-ce input[type="radio"]:checked + label .css-1dp5x4q {
-        transform: translateY(-5px);
-        transition: transform 0.3s ease;
+        transform: translateY(-2px);
     }
 
     </style>
@@ -231,9 +224,10 @@ def run_analysis_clicked():
 with header_col1:
     with st.container(border=False):
         st.markdown('<div class="custom-go-button">', unsafe_allow_html=True)
-        if st.button("🚀 ابدأ التحليل!", use_container_width=True):
+        if st.button("🚀 انطلق!", use_container_width=True):
             run_analysis_clicked()
         st.markdown('</div>', unsafe_allow_html=True)
+
 
 with header_col2:
     st.markdown(f"**آخر تحديث:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -324,3 +318,83 @@ if selected_page == "📊 التحليل":
 
         st.markdown(f"""
             <div class="trade-plan-card">
+                <div class="trade-plan-title">📝 Trade Plan</div>
+        """, unsafe_allow_html=True)
+        
+        trade_plan_col1, trade_plan_col2 = st.columns([2, 1])
+        
+        with trade_plan_col1:
+            st.markdown(f"""
+                <div class="reason-card {reason_class}">
+                    <div class="reason-text">{result['reason']}</div>
+                </div>
+            """, unsafe_allow_html=True)
+            
+        with trade_plan_col2:
+            profit_pct, loss_pct = calculate_pnl_percentages(
+                result['entry'], 
+                result['target'], 
+                result['stop']
+            )
+            
+            st.markdown(f"""
+                <div class="trade-plan-metric">
+                    <div class="trade-plan-metric-label">🔍 سعر الدخول:</div>
+                    <div class="trade-plan-metric-value">{format_price(result['entry'])}</div>
+                </div>
+                <div class="trade-plan-metric">
+                    <div class="trade-plan-metric-label">🎯 السعر المستهدف:</div>
+                    <div class="trade-plan-metric-value">{format_price(result['target'])} <span style='font-size: 14px; color: green;'>({profit_pct:.2f}%)</span></div>
+                </div>
+                <div class="trade-plan-metric">
+                    <div class="trade-plan-metric-label">🛑 وقف الخسارة:</div>
+                    <div class="trade-plan-metric-value">{format_price(result['stop'])} <span style='font-size: 14px; color: red;'>({loss_pct:.2f}%)</span></div>
+                </div>
+            """, unsafe_allow_html=True)
+            
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown("---")
+        
+        st.markdown("### 📊 المقاييس الأساسية")
+        
+        metrics_data = {
+            "funding": {"label": "التمويل", "value": result["metrics"]["funding"], "weight": result["weights"]["funding"]},
+            "oi": {"label": "OI", "value": result["metrics"]["oi"], "weight": result["weights"]["oi"]},
+            "cvd": {"label": "CVD", "value": result["metrics"]["cvd"], "weight": result["weights"]["cvd"]},
+            "orderbook": {"label": "دفتر الطلبات", "value": result["metrics"]["orderbook"], "weight": result["weights"]["orderbook"]},
+            "backtest": {"label": "الاختبار الخلفي", "value": result["metrics"]["backtest"], "weight": result["weights"]["backtest"]}
+        }
+
+        icons = {"funding":"💰","oi":"📊","cvd":"📈","orderbook":"⚖️","backtest":"🧪"}
+        
+        cols = st.columns(len(metrics_data))
+
+        for idx, k in enumerate(metrics_data):
+            with cols[idx]:
+                score = metrics_data[k]["value"]
+                weight = metrics_data[k]["weight"]
+                contrib = round(score * weight * 100, 2)
+                
+                st.metric(label=f"{icons[k]} {metrics_data[k]['label']}", value=f"{score:.3f}", delta=f"w={weight}")
+                st.caption(f"Contribution: {contrib}%")
+
+        st.markdown("---")
+        
+        st.markdown("### 🔍 تحليل إضافي")
+        st.markdown(f"• **الدعم:** {format_price(result['raw']['support'])} | **المقاومة:** {format_price(result['raw']['resistance'])}")
+        st.markdown(f"• **إشارة الشمعة:** {result['raw']['candle_signal'] if result['raw']['candle_signal'] else 'لا يوجد'}")
+        
+        show_raw = st.checkbox("عرض المقاييس الخام", value=False)
+        if show_raw:
+            st.markdown("### المقاييس الخام (من أجل الشفافية)")
+            st.json(result["raw"])
+
+    else:
+        st.info("حدد الأداة/الإطار الزمني واضغط 'انطلق' للبدء.")
+
+elif selected_page == "🧮 الحاسبة":
+    trading_calculator_app()
+
+elif selected_page == "📈 المتتبع":
+    live_market_tracker()
