@@ -140,7 +140,7 @@ def get_score_from_value(value, is_bullish, threshold, scaler):
 # New function to detect big candles with high volume
 def detect_big_candle_volume(ohlcv_df, lookback_period=2, volume_multiplier=1.5):
     if ohlcv_df.empty or len(ohlcv_df) < lookback_period + 1:
-        return None
+        return None, None
 
     last_candles = ohlcv_df.iloc[-lookback_period:]
     avg_vol = ohlcv_df['vol'].iloc[:-lookback_period].mean()
@@ -158,6 +158,93 @@ def detect_big_candle_volume(ohlcv_df, lookback_period=2, volume_multiplier=1.5)
                 return "Bearish Big Candle", candle
     return None, None
 
+# New function to calculate signal strength based on points
+def calculate_signal_strength(metrics, weights):
+    total_score = 0
+    reason_list = []
+    
+    is_bullish = metrics["market_trend"] == "Bullish"
+
+    # Core Metrics Scoring
+    score_cvd = metrics["cvd"]
+    if score_cvd is not None:
+        if is_bullish and score_cvd > 0:
+            total_score += 15
+            reason_list.append("CVD إيجابي (قوة شراء).")
+        elif not is_bullish and score_cvd < 0:
+            total_score += 15
+            reason_list.append("CVD سلبي (قوة بيع).")
+        else:
+            reason_list.append("CVD محايد أو معاكس للاتجاه.")
+
+    score_ob = metrics["orderbook"]
+    if score_ob is not None:
+        if is_bullish and score_ob > 0:
+            total_score += 15
+            reason_list.append("دفتر الطلبات يميل للشراء.")
+        elif not is_bullish and score_ob < 0:
+            total_score += 15
+            reason_list.append("دفتر الطلبات يميل للبيع.")
+        else:
+            reason_list.append("دفتر الطلبات محايد أو معاكس للاتجاه.")
+
+    score_bt = metrics["backtest"]
+    if score_bt is not None and score_bt > 0.6:
+        total_score += 20
+        reason_list.append(f"الاختبار الخلفي لديه معدل فوز مرتفع ({score_bt:.2f}).")
+    elif score_bt is not None and score_bt < 0.4:
+        total_score -= 10
+        reason_list.append(f"الاختبار الخلفي لديه معدل فوز منخفض ({score_bt:.2f}).")
+
+    # Smart Money Signal Scoring (High impact)
+    if metrics["big_candle_signal"] == "Bullish Big Candle":
+        total_score += 25
+        reason_list.append("اكتشاف شمعة صعودية كبيرة بحجم تداول مرتفع.")
+    elif metrics["big_candle_signal"] == "Bearish Big Candle":
+        total_score -= 25
+        reason_list.append("اكتشاف شمعة هبوطية كبيرة بحجم تداول مرتفع.")
+
+    # Additional Factors
+    if metrics["candle_signal"] == "Bullish Engulfing":
+        total_score += 10
+        reason_list.append("إشارة شمعة Bullish Engulfing.")
+    elif metrics["candle_signal"] == "Bearish Engulfing":
+        total_score -= 10
+        reason_list.append("إشارة شمعة Bearish Engulfing.")
+    
+    # Check for Liquidity Traps (Advanced)
+    # This is a simplified logic. In a real system, it's more complex.
+    if metrics["market_trend"] == "Bullish" and metrics["oi"] is not None and metrics["oi"] > 1e9: # High OI as a proxy for liquidity
+        if metrics["cvd"] < 0:
+            # Bullish trend but CVD is bearish = a possible fakeout/bull trap
+            total_score -= 10
+            reason_list.append("تحذير: CVD سلبي على الرغم من الاتجاه الصاعد (قد يكون فخًا).")
+    
+    if metrics["market_trend"] == "Bearish" and metrics["oi"] is not None and metrics["oi"] > 1e9:
+        if metrics["cvd"] > 0:
+            # Bearish trend but CVD is bullish = a possible fakeout/bear trap
+            total_score += 10
+            reason_list.append("تحذير: CVD إيجابي على الرغم من الاتجاه الهابط (قد يكون فخًا).")
+
+    # Final recommendation logic
+    if total_score >= 70:
+        recommendation = "LONG"
+        strength = "Strong"
+    elif total_score >= 50:
+        recommendation = "LONG"
+        strength = "Moderate"
+    elif total_score <= -70: # A negative score for a strong bearish signal
+        recommendation = "SHORT"
+        strength = "Strong"
+    elif total_score <= -50:
+        recommendation = "SHORT"
+        strength = "Moderate"
+    else:
+        recommendation = "Wait"
+        strength = "Neutral"
+        
+    return total_score, recommendation, strength, reason_list
+
 def compute_confidence(instId, bar="1H"):
     with st.spinner("Computing — gathering live data..."):
         ohlcv = fetch_ohlcv(instId, bar, limit=300)
@@ -174,104 +261,54 @@ def compute_confidence(instId, bar="1H"):
     support, resistance = compute_support_resistance(ohlcv)
     candle_signal = detect_candle_signal(ohlcv, bar)
     market_trend = get_market_trend(ohlcv)
-    big_candle_signal, big_candle_data = detect_big_candle_volume(ohlcv)
+    big_candle_signal, big_candle_data = detect_big_candle_volume(ohlcv, lookback_period=5, volume_multiplier=2)
 
-    is_bullish = market_trend == "Bullish"
-    
-    # Assign scores
-    cvd_score = get_score_from_value(cvd, is_bullish, threshold=0, scaler=1e-4)
-    ob_score = get_score_from_value(ob_imb, is_bullish, threshold=0, scaler=20)
-    funding_score = get_score_from_value(funding, is_bullish, threshold=0, scaler=500)
-    oi_score = get_score_from_value(oi, is_bullish, threshold=1e8, scaler=1e-8)
-    bt_score = bt_win if bt_win is not None else 0.5
-
-    # New scoring logic based on big candles and volume
-    vol_score = 0.5
-    if big_candle_signal == "Bullish Big Candle":
-        vol_score = 0.8 # Strong bullish signal
-    elif big_candle_signal == "Bearish Big Candle":
-        vol_score = 0.2 # Strong bearish signal
-        
-    # Assign weights with more intelligence
-    weights = {
-        "cvd": 0.2,
-        "orderbook": 0.2,
-        "funding": 0.1,
-        "oi": 0.1,
-        "backtest": 0.2,
-        "volume": 0.2 # New weight for volume analysis
-    }
-    
-    # Normalize weights to sum to 1
-    total_weight = sum(weights.values())
-    for k in weights:
-        weights[k] /= total_weight
-
-    # Final confidence calculation
+    # Prepare metrics dictionary for scoring
     metrics = {
-        "cvd": cvd_score,
-        "orderbook": ob_score,
-        "funding": funding_score,
-        "oi": oi_score,
-        "backtest": bt_score,
-        "volume": vol_score
+        "cvd": cvd,
+        "orderbook": ob_imb,
+        "backtest": bt_win,
+        "oi": oi,
+        "market_trend": market_trend,
+        "big_candle_signal": big_candle_signal,
+        "candle_signal": candle_signal,
+        "price": price,
     }
     
-    conf = sum(metrics[k] * weights[k] for k in metrics)
-    confidence_pct = round(max(0, min(conf * 100, 100)), 1) if not isnan(conf) else None
+    # Compute the final confidence score and recommendation
+    total_score, recommendation, strength, reason_list = calculate_signal_strength(metrics, None)
+    
+    confidence_pct = round(max(0, min(abs(total_score), 100)), 1) if not isnan(total_score) else None
 
-    # Determine recommendation based on confidence score and new logic
+    # Determine entry, target, and stop
     atr = calculate_atr(ohlcv, period=14)
-    if atr is None or price is None or isnan(atr):
-        recommendation = "Wait"
-        strength = "N/A"
+    entry, target, stop = None, None, None
+    
+    if recommendation in ["LONG", "SHORT"] and atr is not None and price is not None and not isnan(atr):
         entry = price
-        target = stop = None
-        reason = "بيانات غير كافية لإجراء تحليل موثوق."
-    elif confidence_pct is not None:
+        atr_factor = 2.0
         
-        # New logic for "Smart Money" signals
-        if big_candle_signal == "Bullish Big Candle" and ob_score > 0.6 and cvd_score > 0.6:
-            recommendation = "LONG"
-            strength = "Strong"
-            entry = big_candle_data["c"] if big_candle_data is not None else price
-            atr_factor = 2.0
+        if recommendation == "LONG":
             target = round(entry + (atr * atr_factor), 6)
             stop = round(entry - (atr * atr_factor / 2), 6)
-            reason = f"اكتشاف شمعة صعودية كبيرة بحجم تداول مرتفع، وتأكيد من CVD ودفتر الطلبات."
-            
-        elif big_candle_signal == "Bearish Big Candle" and ob_score < 0.4 and cvd_score < 0.4:
-            recommendation = "SHORT"
-            strength = "Strong"
-            entry = big_candle_data["c"] if big_candle_data is not None else price
-            atr_factor = 2.0
+        else: # SHORT
             target = round(entry - (atr * atr_factor), 6)
             stop = round(entry + (atr * atr_factor / 2), 6)
-            reason = f"اكتشاف شمعة هبوطية كبيرة بحجم تداول مرتفع، وتأكيد من CVD ودفتر الطلبات."
-
-        # Fallback to general confidence
-        elif confidence_pct >= 65:
-            recommendation = "LONG" if conf > 0.5 else "SHORT"
-            strength = "Moderate"
-            entry = price
-            atr_factor = 1.5
-            if recommendation == "LONG":
-                target = round(entry + (atr * atr_factor), 6)
-                stop = round(entry - (atr * atr_factor / 2), 6)
-            else:
-                target = round(entry - (atr * atr_factor), 6)
-                stop = round(entry + (atr * atr_factor / 2), 6)
-            reason = f"إشارة عامة. المؤشرات تؤكد الاتجاه ({market_trend})، لكن لا توجد إشارة 'مال ذكي' قوية."
-        else:
-            recommendation = "Wait"
-            strength = "Neutral"
-            entry = price
-            target = stop = None
-            reason = "لا يوجد سبب مقنع للدخول. المؤشرات متضاربة أو الاتجاه غير واضح."
-
+    
+    reason = "، ".join(reason_list) if reason_list else "لا توجد إشارات قوية بما يكفي لإعطاء توصية."
+    
+    # Map metrics to a 0-1 score for the UI
+    ui_metrics_scores = {
+        "cvd": get_score_from_value(cvd, recommendation == "LONG", threshold=0, scaler=1e-4) if cvd is not None else None,
+        "orderbook": get_score_from_value(ob_imb, recommendation == "LONG", threshold=0, scaler=20) if ob_imb is not None else None,
+        "funding": get_score_from_value(funding, recommendation == "LONG", threshold=0, scaler=500) if funding is not None else None,
+        "oi": get_score_from_value(oi, recommendation == "LONG", threshold=1e8, scaler=1e-8) if oi is not None else None,
+        "backtest": bt_win if bt_win is not None else None,
+    }
+    
     raw = {"price":price,"funding":funding,"oi":oi,"cvd":cvd,"orderbook_imbalance":ob_imb,"backtest_win":bt_win,"support":support,"resistance":resistance,"candle_signal":candle_signal, "atr":atr}
 
-    return {"label": recommendation, "confidence_pct": confidence_pct, "recommendation": recommendation, "strength": strength, "entry": entry, "target": target, "stop": stop, "metrics": metrics, "weights": weights, "raw": raw, "reason": reason}
+    return {"label": recommendation, "confidence_pct": confidence_pct, "recommendation": recommendation, "strength": strength, "entry": entry, "target": target, "stop": stop, "metrics": ui_metrics_scores, "weights": None, "raw": raw, "reason": reason}
 
 def trading_calculator_app():
     st.header("🧮 حاسبة التداول")
