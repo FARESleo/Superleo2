@@ -1,8 +1,7 @@
 import requests
 import pandas as pd
 import time
-import streamlit as st
-from datetime import datetime
+import streamlit as st 
 
 OKX_BASE = "https://www.okx.com"
 
@@ -115,7 +114,7 @@ def fetch_trades(instId, limit=400):
         return pd.DataFrame()
     return df.sort_values("ts").reset_index(drop=True)
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=60) # تم التأكد من وجود هذا السطر لحل مشكلة 429
 def get_live_market_data():
     try:
         all_coins = []
