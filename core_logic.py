@@ -4,6 +4,7 @@ from math import isnan
 from data_fetchers import fetch_ohlcv, fetch_ticker, fetch_funding, fetch_oi, fetch_orderbook, fetch_trades, get_live_market_data
 import streamlit as st
 import requests
+from datetime import datetime
 
 # ----------------------------
 # Metrics
