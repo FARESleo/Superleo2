@@ -597,4 +597,50 @@ if st.session_state.page == 'main_scanner':
             )
         
         # Reason Card
-        reason_class = "bullish" if result["recommend
+        reason_class = "bullish" if result["recommendation"] == "LONG" else ("bearish" if result["recommendation"] == "SHORT" else "neutral")
+        st.markdown(f"""
+        <div class="reason-card {reason_class}">
+            <div class="reason-text">**Reason:** {result['reason']}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.subheader("Key Metrics")
+        st.markdown(f"**CVD (Cumulative Volume Delta):** {format_price(result['raw']['cvd'], decimals=2) if result['raw']['cvd'] is not None else 'N/A'}")
+        st.markdown(f"**Orderbook Imbalance:** {round(result['raw']['orderbook_imbalance']*100, 2) if result['raw']['orderbook_imbalance'] is not None else 'N/A'}%")
+        st.markdown(f"**Funding Rate:** {round(result['raw']['funding']*100, 4) if result['raw']['funding'] is not None else 'N/A'}%")
+        st.markdown(f"**Backtest Win Rate:** {round(result['raw']['backtest_win']*100, 2) if result['raw']['backtest_win'] is not None else 'N/A'}%")
+        st.markdown(f"**ATR (14-period):** {format_price(result['raw']['atr'], decimals=4) if result['raw']['atr'] is not None else 'N/A'}")
+        st.markdown(f"**Candle Signal:** {result['raw']['candle_signal'] if result['raw']['candle_signal'] is not None else 'N/A'}")
+        
+elif st.session_state.page == 'calculator':
+    st.title("Risk Calculator")
+    st.info("Here you can build your risk calculator.")
+    
+elif st.session_state.page == 'tracker':
+    st.title("Trade Tracker")
+    st.info("Here you can build your trade tracker.")
+    
+# --- شريط التنقل الثابت في الأسفل ---
+st.markdown('<div class="bottom-nav">', unsafe_allow_html=True)
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.button("Scanner", key="btn_scanner", on_click=lambda: st.session_state.update(page='main_scanner', analysis_results=compute_confidence(st.session_state.selected_instId, st.session_state.bar)))
+with col2:
+    st.button("Calculator", key="btn_calculator", on_click=lambda: st.session_state.update(page='calculator'))
+with col3:
+    st.button("Tracker", key="btn_tracker", on_click=lambda: st.session_state.update(page='tracker'))
+st.markdown('</div>', unsafe_allow_html=True)
+
+st.markdown("""
+<style>
+.st-emotion-cache-1pxx35k.e1f1d6gn2[data-testid="stButton-btn_scanner"] button:before {
+    content: '\\f202'; /* الأيقونة: fa-brain */
+}
+.st-emotion-cache-1pxx35k.e1f1d6gn2[data-testid="stButton-btn_calculator"] button:before {
+    content: '\\f1ec'; /* الأيقونة: fa-calculator */
+}
+.st-emotion-cache-1pxx35k.e1f1d6gn2[data-testid="stButton-btn_tracker"] button:before {
+    content: '\\f201'; /* الأيقونة: fa-chart-line */
+}
+</style>
+""", unsafe_allow_html=True)
