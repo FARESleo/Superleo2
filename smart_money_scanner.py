@@ -610,28 +610,36 @@ elif st.session_state.page == 'tracker':
     st.info("Here you can build your trade tracker.")
     
 # --- شريط التنقل الثابت في الأسفل ---
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.markdown(f"""
-    <div class="nav-btn {'active' if st.session_state.page == 'main_scanner' else ''}">
-        <i class="fas fa-brain icon"></i>
-        <span>Scanner</span>
+st.markdown(
+    f"""
+    <div class="bottom-nav">
+        <a href="#" onclick="document.getElementById('btn_scanner').click(); return false;" class="nav-btn {'active' if st.session_state.page == 'main_scanner' else ''}">
+            <i class="fas fa-brain icon"></i>
+            <span>Scanner</span>
+        </a>
+        <a href="#" onclick="document.getElementById('btn_calculator').click(); return false;" class="nav-btn {'active' if st.session_state.page == 'calculator' else ''}">
+            <i class="fas fa-calculator icon"></i>
+            <span>Calculator</span>
+        </a>
+        <a href="#" onclick="document.getElementById('btn_tracker').click(); return false;" class="nav-btn {'active' if st.session_state.page == 'tracker' else ''}">
+            <i class="fas fa-chart-line icon"></i>
+            <span>Tracker</span>
+        </a>
     </div>
-    """, unsafe_allow_html=True)
-    st.button("Scanner", key="btn_scanner", on_click=lambda: st.session_state.update(page='main_scanner'))
-with col2:
-    st.markdown(f"""
-    <div class="nav-btn {'active' if st.session_state.page == 'calculator' else ''}">
-        <i class="fas fa-calculator icon"></i>
-        <span>Calculator</span>
-    </div>
-    """, unsafe_allow_html=True)
-    st.button("Calculator", key="btn_calculator", on_click=lambda: st.session_state.update(page='calculator'))
-with col3:
-    st.markdown(f"""
-    <div class="nav-btn {'active' if st.session_state.page == 'tracker' else ''}">
-        <i class="fas fa-chart-line icon"></i>
-        <span>Tracker</span>
-    </div>
-    """, unsafe_allow_html=True)
-    st.button("Tracker", key="btn_tracker", on_click=lambda: st.session_state.update(page='tracker'))
+    """,
+    unsafe_allow_html=True
+)
+
+st.button("Scanner", key="btn_scanner", on_click=lambda: st.session_state.update(page='main_scanner'))
+st.button("Calculator", key="btn_calculator", on_click=lambda: st.session_state.update(page='calculator'))
+st.button("Tracker", key="btn_tracker", on_click=lambda: st.session_state.update(page='tracker'))
+
+st.markdown("""
+<style>
+div.stButton {
+    visibility: hidden;
+    height: 0;
+    margin: 0;
+}
+</style>
+""", unsafe_allow_html=True)
