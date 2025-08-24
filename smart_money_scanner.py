@@ -6,83 +6,18 @@ import time
 from math import isnan
 from datetime import datetime
 
-# --- كود CSS للتصميم الاحترافي والأزرار الجديدة ---
+# --- كود إضافة صورة الخلفية ---
 st.markdown(
     """
     <style>
-    /* خلفية التطبيق */
     .stApp {
         background-image: url("https://i.imgur.com/Utvjk6E.png");
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
+        /* هذا التعديل الجديد */
+        z-index: -1;
     }
-
-    /* الشريط الثابت في الأسفل */
-    .bottom-nav {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        background-color: #262730;
-        padding: 10px 0;
-        display: flex;
-        justify-content: space-around;
-        align-items: center;
-        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
-        z-index: 1000;
-    }
-    
-    /* أنماط الأزرار الدائرية الجديدة */
-    .st-emotion-cache-1pxx35k.e1f1d6gn2 {
-        display: flex !important;
-        flex-direction: column;
-        align-items: center;
-        color: white;
-        background-color: transparent;
-        border: none;
-        padding: 0;
-        margin: 0;
-    }
-    .st-emotion-cache-1pxx35k.e1f1d6gn2 button {
-        background: linear-gradient(to right, #6A11CB, #2575FC);
-        color: white;
-        width: 55px;  /* عرض ثابت */
-        height: 55px; /* ارتفاع ثابت */
-        border-radius: 50%; /* لجعلها دائرية */
-        border: none;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: transform 0.2s ease;
-    }
-    .st-emotion-cache-1pxx35k.e1f1d6gn2 button:hover {
-        transform: scale(1.05);
-        box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
-    }
-    /* إخفاء نص الزر */
-    .st-emotion-cache-1pxx35k.e1f1d6gn2 button span {
-        display: none;
-    }
-    /* الأيقونات */
-    .st-emotion-cache-1pxx35k.e1f1d6gn2 button:before {
-        font-family: 'Font Awesome 6 Free';
-        font-weight: 900;
-        font-size: 24px;
-        color: white;
-    }
-    /* أنماط النص تحت الأزرار */
-    .st-emotion-cache-1pxx35k.e1f1d6gn2 span {
-        font-size: 14px;
-        color: white;
-        margin-top: 5px;
-    }
-    .st-emotion-cache-1pxx35k.e1f1d6gn2:hover span {
-        color: #6A11CB;
-    }
-
-    /* بقية الأنماط القديمة */
     .custom-card {
         background-color: #F8F8F8;
         border-radius: 10px;
@@ -171,10 +106,6 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
-# --- كود الأيقونات (مكتبة Font Awesome) ---
-st.markdown('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">', unsafe_allow_html=True)
-
 
 OKX_BASE = "https://www.okx.com"
 
@@ -528,8 +459,6 @@ if 'selected_instId' not in st.session_state:
     st.session_state.selected_instId = "BTC-USDT-SWAP"
 if 'bar' not in st.session_state:
     st.session_state.bar = "1H"
-if 'page' not in st.session_state:
-    st.session_state.page = 'main_scanner'
 
 # Fetch all instruments once
 all_instruments = fetch_instruments("SWAP") + fetch_instruments("SPOT")
@@ -537,110 +466,279 @@ if not all_instruments:
     st.error("Unable to load instruments from OKX.")
     st.stop()
     
-# Title and button placeholders (we will hide these later)
-st.header("🧠 Smart Money Scanner")
+# Title and Button in the same row
+header_col1, header_col2 = st.columns([0.7, 0.3])
+with header_col1:
+    st.header("🧠 Smart Money Scanner")
+
+def run_analysis_clicked():
+    st.session_state.analysis_results = compute_confidence(st.session_state.selected_instId, st.session_state.bar)
+
+with header_col2:
+    st.markdown("""
+        <style>
+        div.stButton > button {
+            background-image: linear-gradient(to right, #6A11CB, #2575FC);
+            color: white;
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            border: none;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            width: 100%;
+        }
+        div.stButton > button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    if st.button("Go"):
+        run_analysis_clicked()
+        
+# Display last updated time
+st.markdown(f"**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 st.markdown("---")
 
-# Main content based on page state
-if st.session_state.page == 'main_scanner':
-    # User inputs for scanner
-    st.session_state.selected_instId = st.selectbox("Select Instrument", all_instruments, index=all_instruments.index(st.session_state.selected_instId) if st.session_state.selected_instId in all_instruments else 0)
-    st.session_state.bar = st.selectbox("Timeframe", ["30m", "15m", "1H", "6H", "12H"], index=["30m", "15m", "1H", "6H", "12H"].index(st.session_state.bar) if st.session_state.bar in ["30m", "15m", "1H", "6H", "12H"] else 0)
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    # Display results
-    if st.session_state.analysis_results:
-        result = st.session_state.analysis_results
-        
-        # Get the confidence color
-        def get_confidence_color(pct):
-            if pct <= 40: return "red"
-            if pct <= 60: return "orange"
-            else: return "green"
+# User inputs
+st.session_state.selected_instId = st.selectbox("Select Instrument", all_instruments, index=all_instruments.index(st.session_state.selected_instId) if st.session_state.selected_instId in all_instruments else 0)
+st.session_state.bar = st.selectbox("Timeframe", ["30m", "15m", "1H", "6H", "12H"], index=["30m", "15m", "1H", "6H", "12H"].index(st.session_state.bar) if st.session_state.bar in ["30m", "15m", "1H", "6H", "12H"] else 0)
 
-        st.markdown(f"**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        st.markdown(f"### Current Price: ${format_price(result['raw']['price'])}", unsafe_allow_html=True)
+
+# Display results if available
+if st.session_state.analysis_results:
+    result = st.session_state.analysis_results
+    
+    # Custom CSS for the cards and progress bar
+    st.markdown("""
+        <style>
+        .custom-card {
+            background-color: #F8F8F8;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            color: #333;
+        }
+        .card-header {
+            font-size: 14px;
+            color: #777;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+        .card-value {
+            font-size: 28px;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        .progress-bar-container {
+            background-color: #ddd;
+            border-radius: 50px;
+            height: 10px;
+            width: 100%;
+            margin-top: 10px;
+        }
+        .progress-bar {
+            height: 100%;
+            border-radius: 50px;
+            transition: width 0.5s ease-in-out;
+        }
+        .trade-plan-card {
+            background-color: #f0f0f0;
+            border-left: 5px solid #6A11CB;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        .trade-plan-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+        }
+        .trade-plan-metric {
+            margin-bottom: 15px;
+        }
+        .trade-plan-metric-label {
+            font-size: 16px;
+            color: #555;
+            font-weight: bold;
+        }
+        .trade-plan-metric-value {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .reason-card {
+            background-color: #f0f4f7;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid;
+        }
+        .reason-text {
+            font-size: 16px;
+            line-height: 1.6;
+            margin-top: 5px;
+            font-style: italic;
+        }
+        .reason-card.bullish {
+            border-color: #4CAF50;
+            background-color: #f0fbf0;
+            color: #2e7d32;
+        }
+        .reason-card.bearish {
+            border-color: #d32f2f;
+            background-color: #fff0f0;
+            color: #b71c1c;
+        }
+        .reason-card.neutral {
+            border-color: #ff9800;
+            background-color: #fff8f0;
+            color: #e65100;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    # Get the confidence color based on the percentage
+    def get_confidence_color(pct):
+        if pct <= 40: return "red"
+        if pct <= 60: return "orange"
+        return "green"
+
+    confidence_color = get_confidence_color(result['confidence_pct'])
+    progress_width = result['confidence_pct']
+
+    # Get the correct emoji for the recommendation
+    rec_emoji = ""
+    if result['recommendation'] == "LONG":
+        rec_emoji = "🚀"
+    elif result['recommendation'] == "SHORT":
+        rec_emoji = "🔻"
+    else:
+        rec_emoji = "⏳"
+    
+    # Visual alert system
+    if result['confidence_pct'] >= 80:
+        st.balloons()
+        st.success("🎉 إشارة قوية جدًا تم اكتشافها! انتبه لهذه الفرصة.", icon="🔥")
+    elif result['confidence_pct'] <= 20:
+        st.warning("⚠️ إشارة ضعيفة جدًا. يفضل توخي الحذر.")
         
-        # Main results section
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(
-                f"""
-                <div class="custom-card">
-                    <div class="card-header">Confidence Score</div>
-                    <div class="card-value" style="color:{get_confidence_color(result['confidence_pct'])}">{result['confidence_pct']}%</div>
-                    <div class="progress-bar-container">
-                        <div class="progress-bar" style="width: {result['confidence_pct']}%; background-color: {get_confidence_color(result['confidence_pct'])};"></div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True
-            )
-        with col2:
-            st.markdown(
-                f"""
-                <div class="trade-plan-card">
-                    <div class="trade-plan-title">Recommendation: {result['recommendation']}</div>
-                    <div class="trade-plan-metric">
-                        <div class="trade-plan-metric-label">Entry:</div>
-                        <div class="trade-plan-metric-value">{format_price(result['entry'])}</div>
-                    </div>
-                    <div class="trade-plan-metric">
-                        <div class="trade-plan-metric-label">Target:</div>
-                        <div class="trade-plan-metric-value">{format_price(result['target'])}</div>
-                    </div>
-                    <div class="trade-plan-metric">
-                        <div class="trade-plan-metric-label">Stop Loss:</div>
-                        <div class="trade-plan-metric-value">{format_price(result['stop'])}</div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True
-            )
-        
-        # Reason Card
-        reason_class = "bullish" if result["recommendation"] == "LONG" else ("bearish" if result["recommendation"] == "SHORT" else "neutral")
+    # Display the main metrics in cards
+    cols = st.columns(3)
+    
+    with cols[0]:
         st.markdown(f"""
-        <div class="reason-card {reason_class}">
-            <div class="reason-text">**Reason:** {result['reason']}</div>
-        </div>
+            <div class="custom-card">
+                <div class="card-header">📊 الثقة</div>
+                <div class="card-value">{result['confidence_pct']}%</div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" style="width:{progress_width}%; background-color:{confidence_color};"></div>
+                </div>
+            </div>
         """, unsafe_allow_html=True)
 
-        st.subheader("Key Metrics")
-        st.markdown(f"**CVD (Cumulative Volume Delta):** {format_price(result['raw']['cvd'], decimals=2) if result['raw']['cvd'] is not None else 'N/A'}")
-        st.markdown(f"**Orderbook Imbalance:** {round(result['raw']['orderbook_imbalance']*100, 2) if result['raw']['orderbook_imbalance'] is not None else 'N/A'}%")
-        st.markdown(f"**Funding Rate:** {round(result['raw']['funding']*100, 4) if result['raw']['funding'] is not None else 'N/A'}%")
-        st.markdown(f"**Backtest Win Rate:** {round(result['raw']['backtest_win']*100, 2) if result['raw']['backtest_win'] is not None else 'N/A'}%")
-        st.markdown(f"**ATR (14-period):** {format_price(result['raw']['atr'], decimals=4) if result['raw']['atr'] is not None else 'N/A'}")
-        st.markdown(f"**Candle Signal:** {result['raw']['candle_signal'] if result['raw']['candle_signal'] is not None else 'N/A'}")
+    with cols[1]:
+        st.markdown(f"""
+            <div class="custom-card">
+                <div class="card-header">⭐ التوصية</div>
+                <div class="card-value">{rec_emoji} {result['recommendation']}</div>
+                <div style="font-size: 14px; color: #999;">({result['strength']})</div>
+            </div>
+        """, unsafe_allow_html=True)
         
-elif st.session_state.page == 'calculator':
-    st.title("Risk Calculator")
-    st.info("Here you can build your risk calculator.")
-    
-elif st.session_state.page == 'tracker':
-    st.title("Trade Tracker")
-    st.info("Here you can build your trade tracker.")
-    
-# --- شريط التنقل الثابت في الأسفل ---
-st.markdown('<div class="bottom-nav">', unsafe_allow_html=True)
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.button("Scanner", key="btn_scanner", on_click=lambda: st.session_state.update(page='main_scanner', analysis_results=compute_confidence(st.session_state.selected_instId, st.session_state.bar)))
-with col2:
-    st.button("Calculator", key="btn_calculator", on_click=lambda: st.session_state.update(page='calculator'))
-with col3:
-    st.button("Tracker", key="btn_tracker", on_click=lambda: st.session_state.update(page='tracker'))
-st.markdown('</div>', unsafe_allow_html=True)
+    with cols[2]:
+        st.markdown(f"""
+            <div class="custom-card">
+                <div class="card-header">📈 السعر الحالي</div>
+                <div class="card-value">{format_price(result['raw']['price'])}</div>
+                <div style="font-size: 14px; color: #999;">{st.session_state.selected_instId}</div>
+            </div>
+        """, unsafe_allow_html=True)
 
-st.markdown("""
-<style>
-.st-emotion-cache-1pxx35k.e1f1d6gn2[data-testid="stButton-btn_scanner"] button:before {
-    content: '\\f202'; /* الأيقونة: fa-brain */
-}
-.st-emotion-cache-1pxx35k.e1f1d6gn2[data-testid="stButton-btn_calculator"] button:before {
-    content: '\\f1ec'; /* الأيقونة: fa-calculator */
-}
-.st-emotion-cache-1pxx35k.e1f1d6gn2[data-testid="stButton-btn_tracker"] button:before {
-    content: '\\f201'; /* الأيقونة: fa-chart-line */
-}
-</style>
-""", unsafe_allow_html=True)
+    st.markdown("---")
+    
+    # The new, improved Trade Plan section
+    
+    reason_class = "neutral"
+    if "صعودية" in result['reason']:
+        reason_class = "bullish"
+    elif "هبوطية" in result['reason']:
+        reason_class = "bearish"
+
+    st.markdown(f"""
+        <div class="trade-plan-card">
+            <div class="trade-plan-title">📝 Trade Plan</div>
+    """, unsafe_allow_html=True)
+    
+    trade_plan_col1, trade_plan_col2 = st.columns([2, 1])
+    
+    with trade_plan_col1:
+        st.markdown(f"""
+            <div class="reason-card {reason_class}">
+                <div class="trade-plan-metric-label">السبب:</div>
+                <div class="reason-text">{result['reason']}</div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+    with trade_plan_col2:
+        st.markdown(f"""
+            <div class="trade-plan-metric">
+                <div class="trade-plan-metric-label">🔍 سعر الدخول:</div>
+                <div class="trade-plan-metric-value">{format_price(result['entry'])}</div>
+            </div>
+            <div class="trade-plan-metric">
+                <div class="trade-plan-metric-label">🎯 السعر المستهدف:</div>
+                <div class="trade-plan-metric-value">{format_price(result['target'])}</div>
+            </div>
+            <div class="trade-plan-metric">
+                <div class="trade-plan-metric-label">🛑 وقف الخسارة:</div>
+                <div class="trade-plan-metric-value">{format_price(result['stop'])}</div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.markdown("### 📊 المقاييس الأساسية")
+    
+    # ***هذا هو الكود المحدث لحل المشكلة***
+    
+    metrics_data = {
+        "funding": {"label": "التمويل", "value": result["metrics"]["funding"], "weight": result["weights"]["funding"]},
+        "oi": {"label": "OI", "value": result["metrics"]["oi"], "weight": result["weights"]["oi"]},
+        "cvd": {"label": "CVD", "value": result["metrics"]["cvd"], "weight": result["weights"]["cvd"]},
+        "orderbook": {"label": "دفتر الطلبات", "value": result["metrics"]["orderbook"], "weight": result["weights"]["orderbook"]},
+        "backtest": {"label": "الاختبار الخلفي", "value": result["metrics"]["backtest"], "weight": result["weights"]["backtest"]}
+    }
+
+    icons = {"funding":"💰","oi":"📊","cvd":"📈","orderbook":"⚖️","backtest":"🧪"}
+    
+    # هنا تم إضافة حلقة التكرار لإنشاء الأعمدة والمقاييس داخلها
+    cols = st.columns(len(metrics_data))
+
+    for idx, k in enumerate(metrics_data):
+        with cols[idx]:
+            score = metrics_data[k]["value"]
+            weight = metrics_data[k]["weight"]
+            contrib = round(score * weight * 100, 2)
+            
+            # هنا يتم عرض المقياس بشكل صحيح داخل كل عمود
+            st.metric(label=f"{icons[k]} {metrics_data[k]['label']}", value=f"{score:.3f}", delta=f"w={weight}")
+            st.caption(f"Contribution: {contrib}%")
+
+
+    st.markdown("---")
+    st.markdown("### 🔍 تحليل إضافي")
+    st.markdown(f"• **الدعم:** {format_price(result['raw']['support'])} | **المقاومة:** {format_price(result['raw']['resistance'])}")
+    st.markdown(f"• **إشارة الشمعة:** {result['raw']['candle_signal'] if result['raw']['candle_signal'] else 'لا يوجد'}")
+    
+    show_raw = st.checkbox("عرض المقاييس الخام", value=False)
+    if show_raw:
+        st.markdown("### المقاييس الخام (من أجل الشفافية)")
+        st.json(result["raw"])
+
+else:
+    st.info("حدد الأداة/الإطار الزمني واضغط 'انطلق' للبدء.")
