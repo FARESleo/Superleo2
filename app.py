@@ -268,7 +268,7 @@ if selected_page == "📊 التحليل":
             return "green"
 
         confidence_color = get_confidence_color(result['confidence_pct'])
-        progress_width = result['confidence_pct'] if result['confidence_pct'] is not None else 0
+        progress_width = result['confidence_pct'] if result['confidence_pct'] is not None and not isnan(result['confidence_pct']) else 0
 
         rec_emoji = ""
         if result['recommendation'] == "LONG":
@@ -278,10 +278,10 @@ if selected_page == "📊 التحليل":
         else:
             rec_emoji = "⏳"
         
-        if result['confidence_pct'] is not None and result['confidence_pct'] >= 80:
+        if result['confidence_pct'] is not None and not isnan(result['confidence_pct']) and result['confidence_pct'] >= 80:
             st.balloons()
             st.success("🎉 إشارة قوية جدًا تم اكتشافها! انتبه لهذه الفرصة.", icon="🔥")
-        elif result['confidence_pct'] is not None and result['confidence_pct'] <= 20:
+        elif result['confidence_pct'] is not None and not isnan(result['confidence_pct']) and result['confidence_pct'] <= 20:
             st.warning("⚠️ إشارة ضعيفة جدًا. يفضل توخي الحذر.")
             
         cols = st.columns(3)
