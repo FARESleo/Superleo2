@@ -128,6 +128,15 @@ def get_market_trend(ohlcv_df, ma_short=20, ma_long=50):
     else:
         return "Neutral"
 
+# New scoring system
+def get_score_from_value(value, is_bullish, threshold, scaler):
+    if value is None: return 0.5
+    if is_bullish:
+        score = 0.5 + np.tanh((value - threshold) * scaler) / 2
+    else:
+        score = 0.5 - np.tanh((value - threshold) * scaler) / 2
+    return score
+
 def compute_confidence(instId, bar="1H"):
     with st.spinner("Computing — gathering live data..."):
         ohlcv = fetch_ohlcv(instId, bar, limit=300)
@@ -137,79 +146,97 @@ def compute_confidence(instId, bar="1H"):
         bids, asks = fetch_orderbook(instId, depth=60)
         trades = fetch_trades(instId, limit=400)
     
+    # Calculate metrics
     cvd = compute_cvd(trades)
     ob_imb = orderbook_imbalance(bids, asks)
-    top_bids, top_asks = find_liquidity_zones(bids, asks)
     bt_win = simple_backtest_winrate(ohlcv, lookahead=6, stop_pct=0.01, rr=2.0)
     support, resistance = compute_support_resistance(ohlcv)
     candle_signal = detect_candle_signal(ohlcv, bar)
     market_trend = get_market_trend(ohlcv)
 
-    fund_score = 0.5 + np.tanh(funding*500)/2 if funding is not None else 0.5
-    oi_score = 0.5 + (np.tanh(np.log1p(oi)/20.0))/2 if oi is not None else 0.5
-    cvd_score = 0.5 + np.tanh(cvd/1e4)/2 if cvd is not None else 0.5
-    ob_score = (ob_imb +1)/2 if ob_imb is not None else 0.5
+    is_bullish = market_trend == "Bullish"
+
+    # Assign scores
+    cvd_score = get_score_from_value(cvd, is_bullish, threshold=0, scaler=1e-4)
+    ob_score = get_score_from_value(ob_imb, is_bullish, threshold=0, scaler=20)
+    funding_score = get_score_from_value(funding, is_bullish, threshold=0, scaler=500)
+    oi_score = get_score_from_value(oi, is_bullish, threshold=1e8, scaler=1e-8) # OI needs a different threshold
     bt_score = bt_win if bt_win is not None else 0.5
 
-    metrics = {"funding": fund_score, "oi": oi_score, "cvd": cvd_score, "orderbook": ob_score, "backtest": bt_score}
-    weights = {"backtest":0.3, "orderbook":0.25, "cvd":0.2, "oi":0.15, "funding":0.1}
-    conf = sum(metrics[k]*weights[k] for k in metrics)
-    confidence_pct = round(max(0, min(conf*100,100)),1) if not isnan(conf) else None
+    # Assign weights based on market trend and candle signal
+    weights = {
+        "cvd": 0.25,
+        "orderbook": 0.2,
+        "funding": 0.15,
+        "oi": 0.1,
+        "backtest": 0.3
+    }
     
-    atr = calculate_atr(ohlcv, period=14)
+    # Adjust weights based on specific signals for more intelligence
+    if candle_signal == "Bullish Engulfing" and is_bullish:
+        weights["orderbook"] += 0.1
+        weights["cvd"] += 0.05
+    elif candle_signal == "Bearish Engulfing" and not is_bullish:
+        weights["orderbook"] += 0.1
+        weights["cvd"] += 0.05
+    
+    # Normalize weights to sum to 1
+    total_weight = sum(weights.values())
+    for k in weights:
+        weights[k] /= total_weight
 
-    # NEW LOGIC
-    # --------------------------------------------------------------------------------------
+    # Final confidence calculation
+    conf = sum(metrics[k] * weights[k] for k, metrics in [("cvd", {"cvd": cvd_score}),
+                                                         ("orderbook", {"orderbook": ob_score}),
+                                                         ("funding", {"funding": funding_score}),
+                                                         ("oi", {"oi": oi_score}),
+                                                         ("backtest", {"backtest": bt_score})])
+
+    confidence_pct = round(max(0, min(conf * 100, 100)), 1) if not isnan(conf) else None
+
+    # Determine recommendation based on confidence score
+    atr = calculate_atr(ohlcv, period=14)
     if atr is None or price is None or isnan(atr):
-        label = "⚠️ Neutral"
         recommendation = "Wait"
+        strength = "N/A"
         entry = price
         target = stop = None
-        strength = "N/A"
         reason = "بيانات غير كافية لإجراء تحليل موثوق."
-    else:
-        is_strong_bullish_signal = (
-            (market_trend == "Bullish") and
-            (confidence_pct is not None and confidence_pct >= 70) and
-            (cvd is not None and cvd > 0) and
-            (ob_imb is not None and ob_imb > 0)
-        )
-        is_strong_bearish_signal = (
-            (market_trend == "Bearish") and
-            (confidence_pct is not None and confidence_pct <= 30) and
-            (cvd is not None and cvd < 0) and
-            (ob_imb is not None and ob_imb < 0)
-        )
-
-        if is_strong_bullish_signal:
-            label = "📈 Bullish"
-            recommendation = "LONG"
+    elif confidence_pct is not None:
+        if confidence_pct >= 80:
+            recommendation = "LONG" if is_bullish else "SHORT"
             strength = "Strong"
             entry = price
-            target = round(price + (atr * 1.5), 6)
-            stop = round(price - (atr * 0.75), 6)
-            reason = f"اتجاه السوق صاعد، CVD إيجابي، سجل طلبات صاعد، وثقة عالية."
-        elif is_strong_bearish_signal:
-            label = "📉 Bearish"
-            recommendation = "SHORT"
-            strength = "Strong"
+            atr_factor = 2.0
+            if recommendation == "LONG":
+                target = round(price + (atr * atr_factor), 6)
+                stop = round(price - (atr * atr_factor / 2), 6)
+            else:
+                target = round(price - (atr * atr_factor), 6)
+                stop = round(price + (atr * atr_factor / 2), 6)
+            reason = f"إشارة قوية جداً. معظم المؤشرات تؤكد الاتجاه ({market_trend})."
+        elif 60 <= confidence_pct < 80:
+            recommendation = "LONG" if is_bullish else "SHORT"
+            strength = "Moderate"
             entry = price
-            target = round(price - (atr * 1.5), 6)
-            stop = round(price + (atr * 0.75), 6)
-            reason = f"اتجاه السوق هابط، CVD سلبي، سجل طلبات هابط، وثقة عالية."
+            atr_factor = 1.5
+            if recommendation == "LONG":
+                target = round(price + (atr * atr_factor), 6)
+                stop = round(price - (atr * atr_factor / 2), 6)
+            else:
+                target = round(price - (atr * atr_factor), 6)
+                stop = round(price + (atr * atr_factor / 2), 6)
+            reason = f"إشارة متوسطة. هناك بعض التناقضات، لكن الاتجاه العام ({market_trend}) مدعوم."
         else:
-            label = "⚠️ Neutral"
             recommendation = "Wait"
             strength = "Neutral"
             entry = price
             target = stop = None
-            reason = "لا يوجد سبب مقنع للدخول. المؤشرات متضاربة أو الاتجاه غير واضح."
+            reason = "المؤشرات متضاربة أو درجة الثقة غير كافية للدخول. يفضل الانتظار."
 
-    # --------------------------------------------------------------------------------------
+    raw = {"price":price,"funding":funding,"oi":oi,"cvd":cvd,"orderbook_imbalance":ob_imb,"backtest_win":bt_win,"support":support,"resistance":resistance,"candle_signal":candle_signal, "atr":atr}
 
-    raw = {"price":price,"funding":funding,"oi":oi,"cvd":cvd,"orderbook_imbalance":ob_imb,"backtest_win":bt_win,"support":support,"resistance":resistance,"candle_signal":candle_signal, "top_bids":top_bids, "top_asks":top_asks, "atr":atr}
-
-    return {"label":label,"confidence_pct":confidence_pct,"recommendation":recommendation,"strength":strength,"entry":entry,"target":target,"stop":stop,"metrics":metrics,"weights":weights,"raw":raw,"reason":reason}
+    return {"label": recommendation, "confidence_pct": confidence_pct, "recommendation": recommendation, "strength": strength, "entry": entry, "target": target, "stop": stop, "metrics": {"funding": funding_score, "oi": oi_score, "cvd": cvd_score, "orderbook": ob_score, "backtest": bt_score}, "weights": weights, "raw": raw, "reason": reason}
 
 def trading_calculator_app():
     st.header("🧮 حاسبة التداول")
