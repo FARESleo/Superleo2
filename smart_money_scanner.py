@@ -724,14 +724,14 @@ if 'selected_leverage' not in st.session_state:
 st.markdown('<div class="bottom-navbar">', unsafe_allow_html=True)
 selected_page = st.radio(
     "Go to",
-    ["التحليل", "الحاسبة", "المتتبع"],
+    ["📊 التحليل", "🧮 الحاسبة", "📈 المتتبع"],
     horizontal=True,
     label_visibility="collapsed",
     key="bottom_nav"
 )
 st.markdown('</div>', unsafe_allow_html=True)
 
-if selected_page == "التحليل":
+if selected_page == "📊 التحليل":
     if st.session_state.analysis_results:
         result = st.session_state.analysis_results
     
@@ -881,8 +881,8 @@ if selected_page == "التحليل":
     else:
         st.info("حدد الأداة/الإطار الزمني واضغط 'انطلق' للبدء.")
 
-elif selected_page == "الحاسبة":
+elif selected_page == "🧮 الحاسبة":
     trading_calculator_app()
 
-elif selected_page == "المتتبع":
+elif selected_page == "📈 المتتبع":
     live_market_tracker()
