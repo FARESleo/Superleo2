@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from math import isnan
+from math import isnan 
 from datetime import datetime
 from core_logic import compute_confidence, trading_calculator_app, live_market_tracker
 from data_fetchers import fetch_instruments
@@ -33,7 +33,6 @@ st.markdown(
         box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
         filter: brightness(1.1);
     }
-
     .custom-card {
         background-color: #F8F8F8;
         border-radius: 10px;
@@ -325,83 +324,3 @@ if selected_page == "📊 التحليل":
 
         st.markdown(f"""
             <div class="trade-plan-card">
-                <div class="trade-plan-title">📝 Trade Plan</div>
-        """, unsafe_allow_html=True)
-        
-        trade_plan_col1, trade_plan_col2 = st.columns([2, 1])
-        
-        with trade_plan_col1:
-            st.markdown(f"""
-                <div class="reason-card {reason_class}">
-                    <div class="reason-text">{result['reason']}</div>
-                </div>
-            """, unsafe_allow_html=True)
-            
-        with trade_plan_col2:
-            profit_pct, loss_pct = calculate_pnl_percentages(
-                result['entry'], 
-                result['target'], 
-                result['stop']
-            )
-            
-            st.markdown(f"""
-                <div class="trade-plan-metric">
-                    <div class="trade-plan-metric-label">🔍 سعر الدخول:</div>
-                    <div class="trade-plan-metric-value">{format_price(result['entry'])}</div>
-                </div>
-                <div class="trade-plan-metric">
-                    <div class="trade-plan-metric-label">🎯 السعر المستهدف:</div>
-                    <div class="trade-plan-metric-value">{format_price(result['target'])} <span style='font-size: 14px; color: green;'>({profit_pct:.2f}%)</span></div>
-                </div>
-                <div class="trade-plan-metric">
-                    <div class="trade-plan-metric-label">🛑 وقف الخسارة:</div>
-                    <div class="trade-plan-metric-value">{format_price(result['stop'])} <span style='font-size: 14px; color: red;'>({loss_pct:.2f}%)</span></div>
-                </div>
-            """, unsafe_allow_html=True)
-            
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        st.markdown("---")
-        
-        st.markdown("### 📊 المقاييس الأساسية")
-        
-        metrics_data = {
-            "funding": {"label": "التمويل", "value": result["metrics"]["funding"], "weight": result["weights"]["funding"]},
-            "oi": {"label": "OI", "value": result["metrics"]["oi"], "weight": result["weights"]["oi"]},
-            "cvd": {"label": "CVD", "value": result["metrics"]["cvd"], "weight": result["weights"]["cvd"]},
-            "orderbook": {"label": "دفتر الطلبات", "value": result["metrics"]["orderbook"], "weight": result["weights"]["orderbook"]},
-            "backtest": {"label": "الاختبار الخلفي", "value": result["metrics"]["backtest"], "weight": result["weights"]["backtest"]}
-        }
-
-        icons = {"funding":"💰","oi":"📊","cvd":"📈","orderbook":"⚖️","backtest":"🧪"}
-        
-        cols = st.columns(len(metrics_data))
-
-        for idx, k in enumerate(metrics_data):
-            with cols[idx]:
-                score = metrics_data[k]["value"]
-                weight = metrics_data[k]["weight"]
-                contrib = round(score * weight * 100, 2)
-                
-                st.metric(label=f"{icons[k]} {metrics_data[k]['label']}", value=f"{score:.3f}", delta=f"w={weight}")
-                st.caption(f"Contribution: {contrib}%")
-
-        st.markdown("---")
-        
-        st.markdown("### 🔍 تحليل إضافي")
-        st.markdown(f"• **الدعم:** {format_price(result['raw']['support'])} | **المقاومة:** {format_price(result['raw']['resistance'])}")
-        st.markdown(f"• **إشارة الشمعة:** {result['raw']['candle_signal'] if result['raw']['candle_signal'] else 'لا يوجد'}")
-        
-        show_raw = st.checkbox("عرض المقاييس الخام", value=False)
-        if show_raw:
-            st.markdown("### المقاييس الخام (من أجل الشفافية)")
-            st.json(result["raw"])
-
-    else:
-        st.info("حدد الأداة/الإطار الزمني واضغط 'ابدأ التحليل!' للبدء.")
-
-elif selected_page == "🧮 الحاسبة":
-    trading_calculator_app()
-
-elif selected_page == "📈 المتتبع":
-    live_market_tracker()
