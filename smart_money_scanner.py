@@ -883,6 +883,6 @@ if selected_page == "التحليل":
 
 elif selected_page == "الحاسبة":
     trading_calculator_app()
-        elif selected_page == "المتتبع":
-    live_market_tracker()
 
+elif selected_page == "المتتبع":
+    live_market_tracker()
