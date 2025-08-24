@@ -113,36 +113,28 @@ st.markdown(
         box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
         padding: 10px 20px;
         display: flex;
-        justify-content: space-around;
+        justify-content: center;
         align-items: center;
         border-top-left-radius: 10px;
         border-top-right-radius: 10px;
     }
-    .nav-button {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        text-decoration: none;
-        color: #6A11CB;
-        padding: 8px 15px;
-        border-radius: 10px;
-        transition: all 0.2s ease;
-        font-size: 14px;
-        font-weight: bold;
-    }
-    .nav-button i {
-        font-size: 20px;
-        margin-bottom: 5px;
-    }
-    .nav-button:hover {
-        color: #2575FC;
+
+    .bottom-navbar .st-bw { /* Targeting Streamlit's radio buttons */
+        border-radius: 50px;
+        padding: 10px 20px;
+        color: #6A11CB; 
         background-color: #f0f0f0;
+        transition: all 0.2s ease;
+        margin: 0 5px;
+        border: none !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
-    .nav-button[data-selected="true"] {
-        color: white;
+    
+    .bottom-navbar .st-bw[aria-selected="true"] {
         background-image: linear-gradient(to right, #6A11CB, #2575FC);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        color: white;
         transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     }
 
     </style>
@@ -722,40 +714,21 @@ def live_market_tracker():
         st.dataframe(display_df, use_container_width=True, hide_index=True)
         st.caption(f"آخر تحديث: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-# ----------------------------------------------------
-# 🌐 التحكم في التنقل بالصفحات 
-# ----------------------------------------------------
-# Get current page from query params
-query_params = st.experimental_get_query_params()
-selected_page = query_params.get("page", ["تحليل"])[0]
+# --- عرض الصفحة المحددة بناءً على شريط التنقل السفلي ---
+if 'selected_leverage' not in st.session_state:
+    st.session_state.selected_leverage = None
 
-# Set the current state
-is_analysis_selected = str(selected_page == "تحليل").lower()
-is_calculator_selected = str(selected_page == "حاسبة").lower()
-is_tracker_selected = str(selected_page == "متتبع").lower()
+st.markdown('<div class="bottom-navbar">', unsafe_allow_html=True)
+selected_page = st.radio(
+    "Go to",
+    ["📊 التحليل", "🧮 الحاسبة", "📈 المتتبع"],
+    horizontal=True,
+    label_visibility="collapsed",
+    key="bottom_nav"
+)
+st.markdown('</div>', unsafe_allow_html=True)
 
-# Render the bottom navigation bar
-st.markdown(f"""
-<div class="bottom-navbar">
-    <a href="?page=تحليل" class="nav-button" data-selected="{is_analysis_selected}">
-        <i class="fas fa-chart-line"></i>
-        <span>التحليل</span>
-    </a>
-    <a href="?page=حاسبة" class="nav-button" data-selected="{is_calculator_selected}">
-        <i class="fas fa-calculator"></i>
-        <span>الحاسبة</span>
-    </a>
-    <a href="?page=متتبع" class="nav-button" data-selected="{is_tracker_selected}">
-        <i class="fas fa-chart-area"></i>
-        <span>المتتبع</span>
-    </a>
-</div>
-""", unsafe_allow_html=True)
-
-# ----------------------------------------------------
-# 🖼️ عرض المحتوى بناءً على الصفحة المختارة
-# ----------------------------------------------------
-if selected_page == "تحليل":
+if selected_page == "📊 التحليل":
     if st.session_state.analysis_results:
         result = st.session_state.analysis_results
     
@@ -905,8 +878,8 @@ if selected_page == "تحليل":
     else:
         st.info("حدد الأداة/الإطار الزمني واضغط 'انطلق' للبدء.")
 
-elif selected_page == "حاسبة":
+elif selected_page == "🧮 الحاسبة":
     trading_calculator_app()
 
-elif selected_page == "متتبع":
+elif selected_page == "📈 المتتبع":
     live_market_tracker()
