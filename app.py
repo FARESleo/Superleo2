@@ -16,6 +16,23 @@ st.markdown(
         background-attachment: fixed;
         z-index: -1;
     }
+    .custom-go-button button {
+        background-image: linear-gradient(to right, #4CAF50, #2E8B57);
+        color: white;
+        font-size: 1.2rem;
+        font-weight: bold;
+        padding: 12px 30px;
+        border-radius: 50px;
+        border: none;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+        position: relative;
+    }
+    .custom-go-button button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        filter: brightness(1.1);
+    }
     .custom-card {
         background-color: #F8F8F8;
         border-radius: 10px;
@@ -101,21 +118,22 @@ st.markdown(
         color: #e65100;
     }
     
-    /* --- New CSS for Bottom Navigation Bar --- */
+    /* --- تصميم الأزرار الجديدة --- */
     .bottom-navbar {
         position: fixed;
         bottom: 0;
         left: 0;
         right: 0;
         z-index: 1000;
-        background-color: white; 
-        box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+        background-color: rgba(255, 255, 255, 0.8);
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
         padding: 10px 20px;
         display: flex;
         justify-content: space-around;
         align-items: center;
-        border-top-left-radius: 10px;
-        border-top-right-radius: 10px;
+        border-top-left-radius: 20px;
+        border-top-right-radius: 20px;
+        backdrop-filter: blur(5px);
     }
     
     .bottom-navbar .st-cr .st-cv {
@@ -124,19 +142,41 @@ st.markdown(
         gap: 15px;
     }
     
-    .bottom-navbar .st-cr .st-cv .st-ce,
-    .bottom-navbar .st-cr .st-cv .st-cf {
-        border-radius: 50px;
+    .bottom-navbar .st-cr .st-cv .st-ce label {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        font-size: 1rem;
+        font-weight: bold;
+        text-align: center;
         padding: 10px 20px;
-        color: #6A11CB; 
+        border-radius: 50px;
+        color: #6A11CB;
         background-color: #f0f0f0;
-        transition: all 0.2s ease;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+
+    .bottom-navbar .st-cr .st-cv .st-ce input[type="radio"] {
+        display: none;
     }
     
-    .bottom-navbar .st-cr .st-cv .st-ce[data-selected="true"] {
+    .bottom-navbar .st-cr .st-cv .st-ce label:hover {
+        background-color: #e0e0e0;
+        transform: translateY(-2px);
+    }
+
+    .bottom-navbar .st-cr .st-cv .st-ce input[type="radio"]:checked + label {
         background-image: linear-gradient(to right, #6A11CB, #2575FC);
         color: white;
-        transform: translateY(-2px);
+        transform: translateY(-3px);
+        box-shadow: 0 0 10px #6A11CB, 0 0 20px #6A11CB, 0 0 30px #2575FC; /* تأثير النيون */
+    }
+
+    /* لتحريك الأيقونة عند التحديد */
+    .bottom-navbar .st-cr .st-cv .st-ce input[type="radio"]:checked + label .css-1dp5x4q {
+        transform: translateY(-5px);
+        transition: transform 0.3s ease;
     }
 
     </style>
@@ -146,7 +186,7 @@ st.markdown(
 
 # --- الدوال المساعدة (يمكن تركها هنا) ---
 def format_price(price, decimals=None):
-    if price is None or isnan(price):
+    if price is None or isinstance(price, (str, bool)) or isnan(price):
         return "N/A"
     if decimals is None:
         if price >= 1000: decimals = 2
@@ -189,8 +229,11 @@ def run_analysis_clicked():
     st.session_state.analysis_results = compute_confidence(st.session_state.selected_instId, st.session_state.bar)
     
 with header_col1:
-    if st.button("🚀 Go"):
-        run_analysis_clicked()
+    with st.container(border=False):
+        st.markdown('<div class="custom-go-button">', unsafe_allow_html=True)
+        if st.button("🚀 ابدأ التحليل!", use_container_width=True):
+            run_analysis_clicked()
+        st.markdown('</div>', unsafe_allow_html=True)
 
 with header_col2:
     st.markdown(f"**آخر تحديث:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -219,12 +262,13 @@ if selected_page == "📊 التحليل":
         result = st.session_state.analysis_results
     
         def get_confidence_color(pct):
+            if pct is None or isnan(pct): return "gray"
             if pct <= 40: return "red"
             if pct <= 60: return "orange"
             return "green"
 
         confidence_color = get_confidence_color(result['confidence_pct'])
-        progress_width = result['confidence_pct']
+        progress_width = result['confidence_pct'] if result['confidence_pct'] is not None else 0
 
         rec_emoji = ""
         if result['recommendation'] == "LONG":
@@ -234,10 +278,10 @@ if selected_page == "📊 التحليل":
         else:
             rec_emoji = "⏳"
         
-        if result['confidence_pct'] >= 80:
+        if result['confidence_pct'] is not None and result['confidence_pct'] >= 80:
             st.balloons()
             st.success("🎉 إشارة قوية جدًا تم اكتشافها! انتبه لهذه الفرصة.", icon="🔥")
-        elif result['confidence_pct'] <= 20:
+        elif result['confidence_pct'] is not None and result['confidence_pct'] <= 20:
             st.warning("⚠️ إشارة ضعيفة جدًا. يفضل توخي الحذر.")
             
         cols = st.columns(3)
@@ -300,6 +344,9 @@ if selected_page == "📊 التحليل":
                 result['target'], 
                 result['stop']
             )
+
+            profit_display = f"({profit_pct:.2f}%)" if profit_pct is not None and not isnan(profit_pct) else "N/A"
+            loss_display = f"({loss_pct:.2f}%)" if loss_pct is not None and not isnan(loss_pct) else "N/A"
             
             st.markdown(f"""
                 <div class="trade-plan-metric">
@@ -308,11 +355,11 @@ if selected_page == "📊 التحليل":
                 </div>
                 <div class="trade-plan-metric">
                     <div class="trade-plan-metric-label">🎯 السعر المستهدف:</div>
-                    <div class="trade-plan-metric-value">{format_price(result['target'])} <span style='font-size: 14px; color: green;'>({profit_pct:.2f}%)</span></div>
+                    <div class="trade-plan-metric-value">{format_price(result['target'])} <span style='font-size: 14px; color: green;'>{profit_display}</span></div>
                 </div>
                 <div class="trade-plan-metric">
                     <div class="trade-plan-metric-label">🛑 وقف الخسارة:</div>
-                    <div class="trade-plan-metric-value">{format_price(result['stop'])} <span style='font-size: 14px; color: red;'>({loss_pct:.2f}%)</span></div>
+                    <div class="trade-plan-metric-value">{format_price(result['stop'])} <span style='font-size: 14px; color: red;'>{loss_display}</span></div>
                 </div>
             """, unsafe_allow_html=True)
             
@@ -340,10 +387,11 @@ if selected_page == "📊 التحليل":
                 weight = metrics_data[k]["weight"]
                 contrib = round(score * weight * 100, 2)
                 
-                st.metric(label=f"{icons[k]} {metrics_data[k]['label']}", value=f"{score:.3f}", delta=f"w={weight}")
+                st.metric(label=f"{icons[k]} {metrics_data[k]['label']}", value=f"{score:.3f}" if score is not None and not isnan(score) else "N/A", delta=f"w={weight}")
                 st.caption(f"Contribution: {contrib}%")
 
         st.markdown("---")
+        
         st.markdown("### 🔍 تحليل إضافي")
         st.markdown(f"• **الدعم:** {format_price(result['raw']['support'])} | **المقاومة:** {format_price(result['raw']['resistance'])}")
         st.markdown(f"• **إشارة الشمعة:** {result['raw']['candle_signal'] if result['raw']['candle_signal'] else 'لا يوجد'}")
@@ -354,7 +402,7 @@ if selected_page == "📊 التحليل":
             st.json(result["raw"])
 
     else:
-        st.info("حدد الأداة/الإطار الزمني واضغط 'انطلق' للبدء.")
+        st.info("حدد الأداة/الإطار الزمني واضغط 'ابدأ التحليل!' للبدء.")
 
 elif selected_page == "🧮 الحاسبة":
     trading_calculator_app()
