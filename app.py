@@ -1,3 +1,5 @@
+# app.py
+
 import streamlit as st
 import pandas as pd
 from math import isnan
@@ -15,21 +17,6 @@ st.markdown(
         background-position: center;
         background-attachment: fixed;
         z-index: -1;
-    }
-    .custom-go-button button {
-        background-image: linear-gradient(to right, #6A11CB, #2575FC);
-        color: white;
-        font-size: 1.2rem;
-        font-weight: bold;
-        padding: 10px 30px;
-        border-radius: 50px;
-        border: none;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-    .custom-go-button button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 8px rgba(0, 0, 0, 0.3);
     }
     .custom-card {
         background-color: #F8F8F8;
@@ -116,7 +103,7 @@ st.markdown(
         color: #e65100;
     }
     
-    /* --- التعديل على شريط التنقل السفلي --- */
+    /* --- New CSS for Bottom Navigation Bar --- */
     .bottom-navbar {
         position: fixed;
         bottom: 0;
@@ -139,34 +126,16 @@ st.markdown(
         gap: 15px;
     }
     
-    /* هذا الجزء يستهدف الأزرار بشكل فعال */
-    .bottom-navbar .st-cr .st-cv .st-ce label {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        font-size: 1rem;
-        font-weight: bold;
-        text-align: center;
-        padding: 10px 20px;
+    .bottom-navbar .st-cr .st-cv .st-ce,
+    .bottom-navbar .st-cr .st-cv .st-cf {
         border-radius: 50px;
-        color: #6A11CB;
+        padding: 10px 20px;
+        color: #6A11CB; 
         background-color: #f0f0f0;
         transition: all 0.2s ease;
-        cursor: pointer;
     }
-
-    /* لإخفاء نقطة الراديو الافتراضية */
-    .bottom-navbar .st-cr .st-cv .st-ce input[type="radio"] {
-        display: none;
-    }
-
-    /* تأثير الهوفر */
-    .bottom-navbar .st-cr .st-cv .st-ce label:hover {
-        background-color: #e0e0e0;
-    }
-
-    /* لتحديد الزر المختار */
-    .bottom-navbar .st-cr .st-cv .st-ce input[type="radio"]:checked + label {
+    
+    .bottom-navbar .st-cr .st-cv .st-ce[data-selected="true"] {
         background-image: linear-gradient(to right, #6A11CB, #2575FC);
         color: white;
         transform: translateY(-2px);
@@ -222,12 +191,8 @@ def run_analysis_clicked():
     st.session_state.analysis_results = compute_confidence(st.session_state.selected_instId, st.session_state.bar)
     
 with header_col1:
-    with st.container(border=False):
-        st.markdown('<div class="custom-go-button">', unsafe_allow_html=True)
-        if st.button("🚀 انطلق!", use_container_width=True):
-            run_analysis_clicked()
-        st.markdown('</div>', unsafe_allow_html=True)
-
+    if st.button("🚀 Go"):
+        run_analysis_clicked()
 
 with header_col2:
     st.markdown(f"**آخر تحديث:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -326,6 +291,7 @@ if selected_page == "📊 التحليل":
         with trade_plan_col1:
             st.markdown(f"""
                 <div class="reason-card {reason_class}">
+                    <div class="trade-plan-metric-label">السبب:</div>
                     <div class="reason-text">{result['reason']}</div>
                 </div>
             """, unsafe_allow_html=True)
@@ -380,7 +346,6 @@ if selected_page == "📊 التحليل":
                 st.caption(f"Contribution: {contrib}%")
 
         st.markdown("---")
-        
         st.markdown("### 🔍 تحليل إضافي")
         st.markdown(f"• **الدعم:** {format_price(result['raw']['support'])} | **المقاومة:** {format_price(result['raw']['resistance'])}")
         st.markdown(f"• **إشارة الشمعة:** {result['raw']['candle_signal'] if result['raw']['candle_signal'] else 'لا يوجد'}")
