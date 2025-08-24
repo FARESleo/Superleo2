@@ -113,6 +113,21 @@ def calculate_atr(ohlcv_df, period=14):
     atr = df['tr'].rolling(period).mean().iloc[-1]
     return atr
 
+def get_market_trend(ohlcv_df, ma_short=20, ma_long=50):
+    if ohlcv_df.empty or len(ohlcv_df) < ma_long:
+        return "Neutral"
+    
+    df = ohlcv_df.copy()
+    df["ema_short"] = df["c"].ewm(span=ma_short, adjust=False).mean()
+    df["ema_long"] = df["c"].ewm(span=ma_long, adjust=False).mean()
+    
+    if df["ema_short"].iloc[-1] > df["ema_long"].iloc[-1]:
+        return "Bullish"
+    elif df["ema_short"].iloc[-1] < df["ema_long"].iloc[-1]:
+        return "Bearish"
+    else:
+        return "Neutral"
+
 def compute_confidence(instId, bar="1H"):
     with st.spinner("Computing — gathering live data..."):
         ohlcv = fetch_ohlcv(instId, bar, limit=300)
@@ -128,6 +143,7 @@ def compute_confidence(instId, bar="1H"):
     bt_win = simple_backtest_winrate(ohlcv, lookahead=6, stop_pct=0.01, rr=2.0)
     support, resistance = compute_support_resistance(ohlcv)
     candle_signal = detect_candle_signal(ohlcv, bar)
+    market_trend = get_market_trend(ohlcv)
 
     fund_score = 0.5 + np.tanh(funding*500)/2 if funding is not None else 0.5
     oi_score = 0.5 + (np.tanh(np.log1p(oi)/20.0))/2 if oi is not None else 0.5
@@ -141,78 +157,55 @@ def compute_confidence(instId, bar="1H"):
     confidence_pct = round(max(0, min(conf*100,100)),1) if not isnan(conf) else None
     
     atr = calculate_atr(ohlcv, period=14)
+
+    # NEW LOGIC
+    # --------------------------------------------------------------------------------------
     if atr is None or price is None or isnan(atr):
         label = "⚠️ Neutral"
         recommendation = "Wait"
         entry = price
         target = stop = None
         strength = "N/A"
-        reason = "بيانات غير كافية."
-    
+        reason = "بيانات غير كافية لإجراء تحليل موثوق."
     else:
-        is_bullish_strong = (
-            (confidence_pct is not None and confidence_pct >= 65) and
+        is_strong_bullish_signal = (
+            (market_trend == "Bullish") and
+            (confidence_pct is not None and confidence_pct >= 70) and
             (cvd is not None and cvd > 0) and
-            (ob_imb is not None and ob_imb > 0) and
-            (candle_signal in ["Bullish Engulfing", "Bullish Morning Star"])
+            (ob_imb is not None and ob_imb > 0)
         )
-        
-        is_bullish_weak = (
-            (confidence_pct is not None and confidence_pct >= 50) and
-            ((cvd is not None and cvd > 0) or (candle_signal in ["Bullish Engulfing", "Bullish Morning Star"]))
-        )
-        
-        is_bearish_strong = (
-            (confidence_pct is not None and confidence_pct <= 35) and
+        is_strong_bearish_signal = (
+            (market_trend == "Bearish") and
+            (confidence_pct is not None and confidence_pct <= 30) and
             (cvd is not None and cvd < 0) and
-            (ob_imb is not None and ob_imb < 0) and
-            (candle_signal == "Bearish Engulfing")
+            (ob_imb is not None and ob_imb < 0)
         )
 
-        is_bearish_weak = (
-            (confidence_pct is not None and confidence_pct <= 50) and
-            ((cvd is not None and cvd < 0) or (candle_signal == "Bearish Engulfing"))
-        )
-        
-        if is_bullish_strong:
+        if is_strong_bullish_signal:
             label = "📈 Bullish"
             recommendation = "LONG"
             strength = "Strong"
             entry = price
-            target = round(entry + (atr * 2), 6)
-            stop = round(entry - atr, 6)
-            reason = f"إشارة صعودية قوية: {candle_signal} + CVD إيجابي + سجل طلبات صاعد."
-        elif is_bullish_weak:
-            label = "📈 Bullish"
-            recommendation = "LONG"
-            strength = "Weak"
-            entry = price
-            target = round(entry + (atr * 1.5), 6)
-            stop = round(entry - atr, 6)
-            reason = f"إشارة صعودية ضعيفة: {candle_signal} أو CVD إيجابي، لكن الإشارات مختلطة."
-        elif is_bearish_strong:
+            target = round(price + (atr * 1.5), 6)
+            stop = round(price - (atr * 0.75), 6)
+            reason = f"اتجاه السوق صاعد، CVD إيجابي، سجل طلبات صاعد، وثقة عالية."
+        elif is_strong_bearish_signal:
             label = "📉 Bearish"
             recommendation = "SHORT"
             strength = "Strong"
             entry = price
-            target = round(entry - (atr * 2), 6)
-            stop = round(entry + atr, 6)
-            reason = f"إشارة هبوطية قوية: {candle_signal} + CVD سلبي + سجل طلبات هابط."
-        elif is_bearish_weak:
-            label = "📉 Bearish"
-            recommendation = "SHORT"
-            strength = "Weak"
-            entry = price
-            target = round(entry - (atr * 1.5), 6)
-            stop = round(entry + atr, 6)
-            reason = f"إشارة هبوطية ضعيفة: {candle_signal} أو CVD سلبي، لكن الإشارات مختلطة."
+            target = round(price - (atr * 1.5), 6)
+            stop = round(price + (atr * 0.75), 6)
+            reason = f"اتجاه السوق هابط، CVD سلبي، سجل طلبات هابط، وثقة عالية."
         else:
             label = "⚠️ Neutral"
             recommendation = "Wait"
             strength = "Neutral"
             entry = price
             target = stop = None
-            reason = "لا يوجد سبب مقنع للدخول. المؤشرات متضاربة."
+            reason = "لا يوجد سبب مقنع للدخول. المؤشرات متضاربة أو الاتجاه غير واضح."
+
+    # --------------------------------------------------------------------------------------
 
     raw = {"price":price,"funding":funding,"oi":oi,"cvd":cvd,"orderbook_imbalance":ob_imb,"backtest_win":bt_win,"support":support,"resistance":resistance,"candle_signal":candle_signal, "top_bids":top_bids, "top_asks":top_asks, "atr":atr}
 
