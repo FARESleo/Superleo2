@@ -5,7 +5,7 @@ from datetime import datetime
 from core_logic import compute_confidence, trading_calculator_app, live_market_tracker
 from data_fetchers import fetch_instruments
 
-# --- كود CSS المعدل لتصميم الواجهة ---
+# --- كود CSS لتصميم الواجهة ---
 st.markdown(
     """
     <style>
@@ -16,50 +16,47 @@ st.markdown(
         background-attachment: fixed;
         z-index: -1;
     }
-    
-    /* --- تعديل زر Go: شكل أكثر دائرية، حجم أكبر، ألوان أزرق --- */
     .custom-go-button button {
-        background-image: linear-gradient(to right, #2196F3, #0D47A1);
+        background-image: linear-gradient(to right, #4CAF50, #2E8B57);
         color: white;
-        font-size: 1.3rem;
+        font-size: 1.2rem;
         font-weight: bold;
-        padding: 15px 35px;
-        border-radius: 100px;
+        padding: 12px 30px;
+        border-radius: 50px;
         border: none;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
         transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
         position: relative;
     }
     .custom-go-button button:hover {
-        transform: scale(1.05);
+        transform: translateY(-3px);
         box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
         filter: brightness(1.1);
     }
 
-    /* --- الكاردز العامة: تغيير إلى خلفية بيضاء مع حواف أزرق --- */
     .custom-card {
-        background-color: #FFFFFF;
-        border-radius: 15px;
-        padding: 25px;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 8px rgba(33, 150, 243, 0.2);
+        background-color: #F8F8F8;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 15px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         color: #333;
     }
     .card-header {
         font-size: 14px;
-        color: #555;
+        color: #777;
         text-transform: uppercase;
         font-weight: bold;
     }
     .card-value {
-        font-size: 30px;
+        font-size: 28px;
         font-weight: bold;
         margin-top: 5px;
     }
     .progress-bar-container {
-        background-color: #e0e0e0;
+        background-color: #ddd;
         border-radius: 50px;
-        height: 12px;
+        height: 10px;
         width: 100%;
         margin-top: 10px;
     }
@@ -68,19 +65,17 @@ st.markdown(
         border-radius: 50px;
         transition: width 0.5s ease-in-out;
     }
-    
-    /* --- كارد خطة التداول: تغيير حواف إلى أزرق --- */
     .trade-plan-card {
-        background-color: #f0f4ff;
-        border-left: 5px solid #2196F3;
-        padding: 25px;
-        border-radius: 15px;
-        margin-bottom: 20px;
+        background-color: #f0f0f0;
+        border-left: 5px solid #6A11CB;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 15px;
     }
     .trade-plan-title {
-        font-size: 26px;
+        font-size: 24px;
         font-weight: bold;
-        color: #0D47A1;
+        color: #333;
         margin-bottom: 15px;
     }
     .trade-plan-metric {
@@ -95,14 +90,12 @@ st.markdown(
         font-size: 20px;
         font-weight: bold;
     }
-    
-    /* --- كارد الأسباب: تعديل الألوان والشكل --- */
     .reason-card {
         background-color: #f0f4f7;
-        border-radius: 12px;
-        padding: 20px;
-        margin-bottom: 15px;
-        border-left: 5px solid;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 10px;
+        border-left: 4px solid;
     }
     .reason-text {
         font-size: 16px;
@@ -112,55 +105,55 @@ st.markdown(
     }
     .reason-card.bullish {
         border-color: #4CAF50;
-        background-color: #e8f5e9;
+        background-color: #f0fbf0;
         color: #2e7d32;
     }
     .reason-card.bearish {
         border-color: #d32f2f;
-        background-color: #ffebee;
+        background-color: #fff0f0;
         color: #b71c1c;
     }
     .reason-card.neutral {
         border-color: #ff9800;
-        background-color: #fff3e0;
+        background-color: #fff8f0;
         color: #e65100;
     }
     
-    /* --- تعديل الشريط السفلي: ألوان أزرق-أخضر، شكل أكثر انسيابية --- */
+    /* --- تصميم الأزرار الجديدة --- */
     .bottom-navbar {
         position: fixed;
         bottom: 0;
         left: 0;
         right: 0;
         z-index: 1000;
-        background-color: rgba(255, 255, 255, 0.9);
-        box-shadow: 0 -2px 15px rgba(0, 0, 0, 0.15);
-        padding: 12px 25px;
+        background-color: rgba(255, 255, 255, 0.8);
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+        padding: 10px 20px;
         display: flex;
         justify-content: space-around;
         align-items: center;
-        border-top-left-radius: 25px;
-        border-top-right-radius: 25px;
-        backdrop-filter: blur(8px);
+        border-top-left-radius: 20px;
+        border-top-right-radius: 20px;
+        backdrop-filter: blur(5px);
     }
     
     .bottom-navbar .st-cr .st-cv {
         flex-direction: row;
         justify-content: space-around;
-        gap: 20px;
+        gap: 15px;
     }
     
     .bottom-navbar .st-cr .st-cv .st-ce label {
         display: flex;
         flex-direction: column;
         align-items: center;
-        font-size: 1.1rem;
+        font-size: 1rem;
         font-weight: bold;
         text-align: center;
-        padding: 12px 25px;
-        border-radius: 100px;
-        color: #2196F3;
-        background-color: #e3f2fd;
+        padding: 10px 20px;
+        border-radius: 50px;
+        color: #6A11CB;
+        background-color: #f0f0f0;
         transition: all 0.3s ease;
         cursor: pointer;
     }
@@ -170,17 +163,18 @@ st.markdown(
     }
     
     .bottom-navbar .st-cr .st-cv .st-ce label:hover {
-        background-color: #bbdefb;
-        transform: translateY(-3px);
+        background-color: #e0e0e0;
+        transform: translateY(-2px);
     }
 
     .bottom-navbar .st-cr .st-cv .st-ce input[type="radio"]:checked + label {
-        background-image: linear-gradient(to right, #2196F3, #4CAF50);
+        background-image: linear-gradient(to right, #6A11CB, #2575FC);
         color: white;
-        transform: translateY(-4px);
-        box-shadow: 0 0 12px #2196F3, 0 0 24px #2196F3, 0 0 36px #4CAF50;
+        transform: translateY(-3px);
+        box-shadow: 0 0 10px #6A11CB, 0 0 20px #6A11CB, 0 0 30px #2575FC; /* تأثير النيون */
     }
 
+    /* لتحريك الأيقونة عند التحديد */
     .bottom-navbar .st-cr .st-cv .st-ce input[type="radio"]:checked + label .css-1dp5x4q {
         transform: translateY(-5px);
         transition: transform 0.3s ease;
@@ -191,7 +185,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# --- الدوال المساعدة ---
+# --- الدوال المساعدة (يمكن تركها هنا) ---
 def format_price(price, decimals=None):
     if price is None or isnan(price):
         return "N/A"
@@ -221,8 +215,6 @@ if 'selected_instId' not in st.session_state:
     st.session_state.selected_instId = "BTC-USDT-SWAP"
 if 'bar' not in st.session_state:
     st.session_state.bar = "1H"
-if 'selected_page' not in st.session_state:
-    st.session_state.selected_page = "📊 التحليل"  # تعريف مبدئي للصفحة
 
 # Fetch all instruments once
 all_instruments = fetch_instruments("SWAP") + fetch_instruments("SPOT")
@@ -252,9 +244,12 @@ st.markdown("---")
 st.session_state.selected_instId = st.selectbox("حدد الأداة", all_instruments, index=all_instruments.index(st.session_state.selected_instId) if st.session_state.selected_instId in all_instruments else 0)
 st.session_state.bar = st.selectbox("الإطار الزمني", ["30m", "15m", "1H", "6H", "12H"], index=["30m", "15m", "1H", "6H", "12H"].index(st.session_state.bar) if st.session_state.bar in ["30m", "15m", "1H", "6H", "12H"] else 0)
 
-# --- تعريف الشريط السفلي للتنقل ---
+# --- عرض الصفحة المحددة بناءً على شريط التنقل السفلي ---
+if 'selected_leverage' not in st.session_state:
+    st.session_state.selected_leverage = None
+
 st.markdown('<div class="bottom-navbar">', unsafe_allow_html=True)
-st.session_state.selected_page = st.radio(
+selected_page = st.radio(
     "Go to",
     ["📊 التحليل", "🧮 الحاسبة", "📈 المتتبع"],
     horizontal=True,
@@ -263,9 +258,7 @@ st.session_state.selected_page = st.radio(
 )
 st.markdown('</div>', unsafe_allow_html=True)
 
-# --- عرض الصفحة المحددة بناءً على الشريط السفلي ---
-if st.session_state.selected_page == "📊 التحليل":
-    st.markdown('<div style="background-color: rgba(227, 242, 253, 0.8); padding: 20px; border-radius: 15px;">', unsafe_allow_html=True)
+if selected_page == "📊 التحليل":
     if st.session_state.analysis_results:
         result = st.session_state.analysis_results
     
@@ -403,16 +396,12 @@ if st.session_state.selected_page == "📊 التحليل":
         if show_raw:
             st.markdown("### المقاييس الخام (من أجل الشفافية)")
             st.json(result["raw"])
+
     else:
         st.info("حدد الأداة/الإطار الزمني واضغط 'ابدأ التحليل!' للبدء.")
-    st.markdown('</div>', unsafe_allow_html=True)
 
-elif st.session_state.selected_page == "🧮 الحاسبة":
-    st.markdown('<div style="background-color: rgba(232, 245, 233, 0.8); padding: 20px; border-radius: 15px;">', unsafe_allow_html=True)
+elif selected_page == "🧮 الحاسبة":
     trading_calculator_app()
-    st.markdown('</div>', unsafe_allow_html=True)
 
-elif st.session_state.selected_page == "📈 المتتبع":
-    st.markdown('<div style="background-color: rgba(255, 243, 224, 0.8); padding: 20px; border-radius: 15px;">', unsafe_allow_html=True)
+elif selected_page == "📈 المتتبع":
     live_market_tracker()
-    st.markdown('</div>', unsafe_allow_html=True)
